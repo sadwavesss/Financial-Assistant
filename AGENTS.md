@@ -8,6 +8,7 @@
   pin exact versions in `requirements.txt` / `requirements-dev.txt`.
 
 ## Commands
+- Init DB (migrations + default categories): `.\.venv\Scripts\python.exe -m app.cli init-db`
 - Run app: `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload`
 - Tests: `.\.venv\Scripts\python.exe -m pytest`
 - Lint: `.\.venv\Scripts\python.exe -m ruff check .`
@@ -26,3 +27,5 @@
 - The project is a coursework split into 3 parts (stages 0–3, 4–6, 7–9).
   Stop after each stage, explain what was done, and wait for the user's approval.
 - Verify every stage with pytest + ruff before committing.
+- Commit messages: short single line in English, no body and no co-author trailer.
+- Remote: https://github.com/sadwavesss/Financial-Assistant.git (branch `main`).

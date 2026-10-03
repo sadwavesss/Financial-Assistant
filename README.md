@@ -23,7 +23,10 @@ app/
   main.py          точка входа, сборка приложения
   config.py        настройки (переменные окружения, .env)
   database.py      подключение к БД, сессии
+  cli.py           консольные команды (python -m app.cli --help)
   models/          ORM-модели (таблицы БД)
+  services/        бизнес-логика
+  utils/           вспомогательные функции
   api/             REST API (JSON), документация на /docs
   web/             HTML-страницы
   templates/       шаблоны Jinja2
@@ -39,7 +42,7 @@ tests/             автоматические тесты
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env        # при необходимости отредактировать
-.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\python.exe -m app.cli init-db   # миграции + стартовые категории
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
@@ -60,4 +63,17 @@ Copy-Item .env.example .env        # при необходимости отре�
 
 Установить драйвер (`pip install "psycopg[binary]"`), указать в `.env`
 `DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/finance`
-и выполнить `alembic upgrade head`. Код приложения менять не нужно.
+и выполнить `python -m app.cli init-db`. Код приложения менять не нужно.
+
+## Модель данных
+
+| Таблица | Назначение |
+|---|---|
+| `categories` | Категории доходов и расходов (название, тип, цвет, признак системной) |
+| `category_rules` | Ключевые слова для автоматической категоризации |
+| `transactions` | Операции: дата, тип, сумма, валюта, курс, сумма в BYN, описание, категория |
+| `exchange_rates` | Кэш курсов НБРБ (BYN за 1 единицу валюты на дату) |
+
+Суммы хранятся в `Numeric(12, 2)` (точная десятичная арифметика), сумма операции всегда
+положительна, направление определяется типом. Вся аналитика считается в BYN по полю
+`amount_byn`.
