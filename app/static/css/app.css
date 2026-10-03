@@ -7,3 +7,10 @@
 .card {
     border-radius: 0.75rem;
 }
+
+/* Category label tinted with the category's own color. */
+.category-badge {
+    color: var(--category-color);
+    background-color: color-mix(in srgb, var(--category-color) 14%, transparent);
+    font-weight: 500;
+}

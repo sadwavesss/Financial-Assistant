@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% set title = "Изменение операции" if transaction else "Новая операция" %}
+{% block title %}{{ title }} — {{ app_name }}{% endblock %}
+
+{% macro field_error(name) -%}
+    {% if errors[name] %}<div class="invalid-feedback d-block">{{ errors[name] }}</div>{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8 col-xl-7">
+    <h1 class="h3 mb-3">{{ title }}</h1>
+
+    {% if errors["__all__"] %}
+    <div class="alert alert-danger">{{ errors["__all__"] }}</div>
+    {% endif %}
+
+    <form id="transaction-form" class="card border-0 shadow-sm" method="post" novalidate
+          data-rate-error="{{ 'true' if errors.rate else 'false' }}"
+          data-history-rate="{{ history.rate if history else '' }}">
+        <div class="card-body row g-3">
+            {# ---------- Type ---------- #}
+            <div class="col-12">
+                <div class="btn-group w-100" role="group" aria-label="Тип операции">
+                    {% for item in types %}
+                    <input type="radio" class="btn-check" name="type" id="type_{{ item.value }}"
+                           value="{{ item.value }}" autocomplete="off"
+                           {% if form.type == item.value %}checked{% endif %}>
+                    <label class="btn btn-outline-{{ 'success' if item.value == 'income' else 'danger' }}"
+                           for="type_{{ item.value }}">{{ type_labels[item] }}</label>
+                    {% endfor %}
+                </div>
+                {{ field_error("type") }}
+            </div>
+
+            {# ---------- Date, amount, currency ---------- #}
+            <div class="col-md-4">
+                <label class="form-label" for="date">Дата</label>
+                <input class="form-control {% if errors.date %}is-invalid{% endif %}" type="date"
+                       id="date" name="date" value="{{ form.date or '' }}" required>
+                {{ field_error("date") }}
+            </div>
+            <div class="col-md-5">
+                <label class="form-label" for="amount">Сумма</label>
+                <input class="form-control {% if errors.amount %}is-invalid{% endif %}" type="text"
+                       inputmode="decimal" id="amount" name="amount" placeholder="0,00"
+                       value="{{ form.amount or '' }}" required>
+                {{ field_error("amount") }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="currency">Валюта</label>
+                <select class="form-select {% if errors.currency %}is-invalid{% endif %}" id="currency" name="currency">
+                    {% for item in currencies %}
+                    <option value="{{ item.value }}" {% if form.currency == item.value %}selected{% endif %}>{{ item.value }}</option>
+                    {% endfor %}
+                </select>
+                {{ field_error("currency") }}
+            </div>
+
+            {# ---------- Exchange rate (only for foreign currency) ---------- #}
+            {% if errors.rate %}
+                {% set selected_mode = "history" if history else "manual" %}
+            {% else %}
+                {% set selected_mode = form.rate_mode or "auto" %}
+            {% endif %}
+            <div class="col-12 {% if form.currency == 'BYN' %}d-none{% endif %}" id="rate-block">
+                <div class="border rounded-3 p-3 bg-body-tertiary">
+                    <div class="fw-semibold mb-1">Курс к BYN</div>
+                    <div id="rate-info" class="small mb-2 {{ 'text-danger' if errors.rate else 'text-body-secondary' }}">
+                        {% if errors.rate %}
+                            {{ errors.rate }}
+                        {% elif transaction and transaction.rate_source %}
+                            Сохранённый курс: {{ transaction.exchange_rate|rate }}
+                            ({{ rate_source_labels[transaction.rate_source] }})
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rate_mode" id="rate_mode_auto"
+                               value="auto" {% if selected_mode == "auto" %}checked{% endif %}
+                               {% if errors.rate %}disabled{% endif %}>
+                        <label class="form-check-label" for="rate_mode_auto">
+                            Автоматически <span class="text-body-secondary small">(НБРБ → ЦБ РФ → currency-api)</span>
+                        </label>
+                    </div>
+
+                    <div class="form-check d-flex align-items-center gap-2 mt-1">
+                        <input class="form-check-input" type="radio" name="rate_mode" id="rate_mode_manual"
+                               value="manual" {% if selected_mode == "manual" %}checked{% endif %}>
+                        <label class="form-check-label text-nowrap" for="rate_mode_manual">Ввести вручную</label>
+                        <input class="form-control form-control-sm {% if errors.manual_rate %}is-invalid{% endif %}"
+                               style="max-width: 9rem" type="text" inputmode="decimal" name="manual_rate"
+                               id="manual_rate" placeholder="например 3,25" value="{{ form.manual_rate or '' }}">
+                    </div>
+                    {{ field_error("manual_rate") }}
+
+                    <div class="form-check mt-1 {% if not history %}d-none{% endif %}" id="history-option">
+                        <input class="form-check-input" type="radio" name="rate_mode" id="rate_mode_history"
+                               value="history" {% if selected_mode == "history" %}checked{% endif %}>
+                        <label class="form-check-label" for="rate_mode_history">
+                            Курс из истории операций:
+                            <span id="history-label" class="fw-semibold">
+                                {% if history %}{{ history.rate|rate }} BYN ({{ history.date|date_ru }}){% endif %}
+                            </span>
+                        </label>
+                    </div>
+
+                    <div id="byn-preview" class="mt-2 small fw-semibold"></div>
+                </div>
+            </div>
+
+            {# ---------- Category and description ---------- #}
+            <div class="col-md-5">
+                <label class="form-label" for="category_id">Категория</label>
+                <select class="form-select {% if errors.category_id %}is-invalid{% endif %}" id="category_id" name="category_id">
+                    <option value="">Без категории</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" data-type="{{ category.type.value }}"
+                            {% if form.category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                {{ field_error("category_id") }}
+            </div>
+            <div class="col-md-7">
+                <label class="form-label" for="description">Описание</label>
+                <input class="form-control {% if errors.description %}is-invalid{% endif %}" type="text"
+                       id="description" name="description" maxlength="255"
+                       placeholder="Например: Евроопт, продукты" value="{{ form.description or '' }}">
+                {{ field_error("description") }}
+            </div>
+        </div>
+        <div class="card-footer bg-body d-flex justify-content-end gap-2 py-3">
+            <a class="btn btn-outline-secondary" href="/transactions">Отмена</a>
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/transaction_form.js') }}"></script>
+{% endblock %}

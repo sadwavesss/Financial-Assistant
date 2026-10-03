@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Ошибка — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning shadow-sm">
+    <h5 class="alert-heading">Не удалось выполнить действие</h5>
+    <p class="mb-0">{{ message }}</p>
+</div>
+<a class="btn btn-outline-primary" href="/transactions">К списку операций</a>
+{% endblock %}

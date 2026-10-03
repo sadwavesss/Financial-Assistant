@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.web import pages
+from app.web import pages, transactions
 
 web_router = APIRouter(include_in_schema=False)
 web_router.include_router(pages.router)
+web_router.include_router(transactions.router)

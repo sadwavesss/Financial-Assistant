@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     app_name: str = "Финансовый ассистент"
     debug: bool = False
     database_url: str = "sqlite:///data/finance.db"
-    nbrb_api_url: str = "https://api.nbrb.by/exrates/rates"
-    nbrb_timeout_seconds: float = 10.0
+    # Timeout of one request to an online exchange rate source.
+    rate_request_timeout_seconds: float = 5.0
+    # How far (in days) a rate from the system's own history may be from the operation date.
+    rate_history_max_days: int = Field(default=7, ge=0)
 
     @field_validator("database_url")
     @classmethod

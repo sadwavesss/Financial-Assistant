@@ -24,8 +24,13 @@ class CategorySource(StrEnum):
 
 
 class RateSource(StrEnum):
-    NBRB = "nbrb"  # National Bank of the Republic of Belarus API
+    """Where the exchange rate of a transaction came from."""
+
+    NBRB = "nbrb"  # National Bank of the Republic of Belarus (primary source)
+    CBR = "cbr"  # Central Bank of Russia: USD/RUB and BYN/RUB cross rate (backup)
+    CURRENCY_API = "currency_api"  # open market rates API (second backup)
     MANUAL = "manual"  # entered by the user
+    HISTORY = "history"  # taken from earlier conversions stored in this system
 
 
 def enum_type(enum_cls: type[StrEnum], name: str) -> Enum:

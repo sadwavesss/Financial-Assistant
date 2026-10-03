@@ -1,4 +1,4 @@
-"""Shared test fixtures: an isolated in-memory database and an HTTP test client."""
+"""Shared test fixtures: an isolated in-memory database, fake rate sources and an HTTP client."""
 
 from collections.abc import Iterator
 
@@ -10,7 +10,11 @@ from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401  (registers all ORM models in Base.metadata)
 from app.database import Base, build_engine, get_db
+from app.dependencies import get_rate_providers
 from app.main import app
+from app.models import RateSource
+from app.services.categories import seed_default_categories
+from tests.helpers import ONLINE_SOURCES, FakeRateProvider
 
 
 @pytest.fixture
@@ -30,8 +34,32 @@ def db(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(db: Session) -> Iterator[TestClient]:
+def seeded_db(db: Session) -> Session:
+    seed_default_categories(db)
+    return db
+
+
+@pytest.fixture
+def providers() -> list[FakeRateProvider]:
+    """All sources online; each answers differently, so a wrong order would be noticed."""
+    return [
+        FakeRateProvider(RateSource.NBRB, "3.25"),
+        FakeRateProvider(RateSource.CBR, "3.26"),
+        FakeRateProvider(RateSource.CURRENCY_API, "3.27"),
+    ]
+
+
+@pytest.fixture
+def offline_providers() -> list[FakeRateProvider]:
+    """No Internet: every online source fails."""
+    return [FakeRateProvider(source, None) for source in ONLINE_SOURCES]
+
+
+@pytest.fixture
+def client(db: Session, providers: list[FakeRateProvider]) -> Iterator[TestClient]:
+    """HTTP client with the test database and offline fake rate sources."""
     app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_rate_providers] = lambda: providers
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

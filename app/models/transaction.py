@@ -5,11 +5,12 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.database import Base
-from app.models.enums import CategorySource, Currency, TransactionType, enum_type
+from app.models.enums import CategorySource, Currency, RateSource, TransactionType, enum_type
 from app.models.mixins import TimestampMixin
+from app.utils.text import normalize_text
 
 if TYPE_CHECKING:
     from app.models.category import Category
@@ -34,10 +35,14 @@ class Transaction(TimestampMixin, Base):
     )
     # BYN per one unit of `currency` on `date` (1 for BYN).
     exchange_rate: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(1))
+    # Where the rate came from; NULL for BYN operations (no conversion needed).
+    rate_source: Mapped[RateSource | None] = mapped_column(enum_type(RateSource, "rate_source"))
     # Amount converted to BYN: all analytics are calculated in this column.
     amount_byn: Mapped[Decimal] = mapped_column(Numeric(12, 2))
 
     description: Mapped[str] = mapped_column(String(255), default="")
+    # Lower-cased copy for case-insensitive search: SQLite LIKE ignores case only for Latin.
+    description_normalized: Mapped[str] = mapped_column(String(255), default="", server_default="")
 
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), index=True
@@ -50,6 +55,11 @@ class Transaction(TimestampMixin, Base):
     import_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
 
     category: Mapped["Category | None"] = relationship(back_populates="transactions")
+
+    @validates("description")
+    def _sync_normalized_description(self, _key: str, value: str) -> str:
+        self.description_normalized = normalize_text(value)
+        return value
 
     def __repr__(self) -> str:
         return (

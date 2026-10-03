@@ -23,6 +23,7 @@ class ExchangeRate(TimestampMixin, Base):
     date: Mapped[dt.date]
     # BYN per one unit of `currency` (NBRB rate divided by its scale).
     rate: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    # Only online sources are cached; manual and history-based rates belong to a transaction.
     source: Mapped[RateSource] = mapped_column(enum_type(RateSource, "rate_source"))
 
     def __repr__(self) -> str:
