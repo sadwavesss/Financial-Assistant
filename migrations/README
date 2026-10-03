@@ -1,0 +1,5 @@
+Database migrations (Alembic).
+
+Apply all migrations:          alembic upgrade head
+Create a migration from models: alembic revision --autogenerate -m "description"
+Roll back the last migration:   alembic downgrade -1

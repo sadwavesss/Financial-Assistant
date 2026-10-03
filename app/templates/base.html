@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='vendor/bootstrap/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100 bg-body-tertiary">
+{% set nav_items = [
+    ("index", "/", "Главная"),
+] %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-semibold" href="/">{{ app_name }}</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Меню">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto">
+                {% for key, href, label in nav_items %}
+                <li class="nav-item">
+                    <a class="nav-link {% if active_page == key %}active{% endif %}" href="{{ href }}">{{ label }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+            <a class="btn btn-sm btn-outline-light" href="/docs" target="_blank">API</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container py-4 flex-grow-1">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="py-3 border-top bg-body text-body-secondary small">
+    <div class="container d-flex justify-content-between">
+        <span>{{ app_name }}</span>
+        <span>версия {{ app_version }}</span>
+    </div>
+</footer>
+
+<script src="{{ url_for('static', path='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

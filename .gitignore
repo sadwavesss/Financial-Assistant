@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+.env
+
+# Runtime data: database, trained models, generated files
+data/*
+!data/.gitkeep
+!data/samples/
+data/samples/*
+!data/samples/*.csv
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,9 @@
+/* Application-specific styles on top of Bootstrap. */
+
+.navbar-brand {
+    letter-spacing: 0.02em;
+}
+
+.card {
+    border-radius: 0.75rem;
+}
