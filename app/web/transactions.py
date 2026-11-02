@@ -16,7 +16,8 @@ from app.services import transactions as service
 from app.services.categories import list_categories
 from app.services.errors import InvalidDataError
 from app.services.exchange_rates import RateQuote, RateUnavailableError
-from app.web.forms import clean_form, form_errors
+from app.utils.validation import humanize_errors
+from app.web.forms import clean_form
 from app.web.templating import templates
 
 router = APIRouter(prefix="/transactions")
@@ -35,7 +36,7 @@ def transaction_list(request: Request, db: DbSession) -> HTMLResponse:
         filters = TransactionFilters.model_validate(raw_filters)
         errors: dict[str, str] = {}
     except ValidationError as exc:
-        filters, errors = TransactionFilters(), form_errors(exc)
+        filters, errors = TransactionFilters(), humanize_errors(exc)
 
     result = service.list_transactions(db, filters)
     # Query string without page/message, used to build pagination links that keep filters.
@@ -113,7 +114,7 @@ def _save(
     try:
         action(TransactionIn.model_validate(form))
     except ValidationError as exc:
-        return _render_form(request, db, form, transaction, errors=form_errors(exc))
+        return _render_form(request, db, form, transaction, errors=humanize_errors(exc))
     except InvalidDataError as exc:
         errors = {exc.field or "__all__": exc.message}
         return _render_form(request, db, form, transaction, errors=errors)

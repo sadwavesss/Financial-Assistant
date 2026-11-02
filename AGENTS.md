@@ -11,6 +11,7 @@
 
 ## Commands
 - Init DB (migrations + default categories): `.\.venv\Scripts\python.exe -m app.cli init-db`
+- Demo data: `.\.venv\Scripts\python.exe -m app.cli demo-data [--load] [--months N] [--seed S]`
 - Run app: `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload`
 - Tests: `.\.venv\Scripts\python.exe -m pytest`
 - Lint: `.\.venv\Scripts\python.exe -m ruff check .`
@@ -29,6 +30,20 @@
 - Money is stored as `Decimal` / `Numeric(12, 2)`, never `float`.
 - Analytics are calculated in BYN; USD operations are converted at the NBRB rate on the operation date.
 - Third-party front-end libraries are vendored in `app/static/vendor/` (works offline).
+
+## Roadmap
+The university requires a *hybrid intelligent system* (symbolic + statistical components with
+real integration, explainability, step-by-step decision trace, comparison of rules-only /
+ML-only / hybrid quality). No LLM in the coursework (user decision; maybe in the diploma).
+- Part 1: 0 skeleton, 1 models, 2 transactions + rates, 3 CSV import + demo data generator.
+- Part 2: 4 hybrid categorization (keyword rules -> TF-IDF + LogisticRegression -> arbitration
+  on low confidence / conflicts, explanation per transaction, evaluation of the 3 variants);
+  5 analytics dashboard; 6 recurring payments.
+- Part 3: 7 forecasting (baseline / linear regression / Holt, choose by MAE);
+  8 knowledge base of production rules + inference engine over ML facts (forecast, analytics)
+  with a trace of fired rules; 9 polish.
+- The demo data generator produces labeled data (ground-truth categories) used to evaluate
+  the categorizer in stage 4.
 
 ## Workflow
 - The project is a coursework split into 3 parts (stages 0–3, 4–6, 7–9).

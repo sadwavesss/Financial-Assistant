@@ -2,10 +2,11 @@
 
 from fastapi import APIRouter
 
-from app.api import categories, health, rates, transactions
+from app.api import categories, health, imports, rates, transactions
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(transactions.router)
+api_router.include_router(imports.router)
 api_router.include_router(categories.router)
 api_router.include_router(rates.router)

@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from typing import Annotated
 
 import httpx
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 from sqlalchemy.orm import Session
 
 from app import __version__
@@ -21,6 +21,11 @@ def get_rate_providers() -> Iterator[list[RateProvider]]:
         follow_redirects=True,
     ) as client:
         yield default_providers(client)
+
+
+async def read_upload(file: UploadFile) -> bytes:
+    """Read at most the allowed size + 1 byte, so huge uploads are rejected without loading them."""
+    return await file.read(get_settings().import_max_bytes + 1)
 
 
 DbSession = Annotated[Session, Depends(get_db)]

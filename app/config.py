@@ -10,6 +10,7 @@ from sqlalchemy.engine import make_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BASE_DIR / "app"
 DATA_DIR = BASE_DIR / "data"
+IMPORTS_DIR = DATA_DIR / "imports"  # uploaded files waiting for the user's confirmation
 TEMPLATES_DIR = APP_DIR / "templates"
 STATIC_DIR = APP_DIR / "static"
 
@@ -28,6 +29,9 @@ class Settings(BaseSettings):
     rate_request_timeout_seconds: float = 5.0
     # How far (in days) a rate from the system's own history may be from the operation date.
     rate_history_max_days: int = Field(default=7, ge=0)
+    # Limits of one imported file.
+    import_max_bytes: int = 5 * 1024 * 1024
+    import_max_rows: int = 10_000
 
     @field_validator("database_url")
     @classmethod

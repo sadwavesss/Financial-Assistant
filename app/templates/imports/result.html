@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Импорт завершён — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+    <h1 class="h3 mb-3">Импорт завершён</h1>
+
+    <div class="alert {{ 'alert-success' if report.created else 'alert-warning' }}">
+        Добавлено операций: <strong>{{ report.created }}</strong>.
+        Пропущено дубликатов: {{ report.duplicates }}.
+        Строк с ошибками: {{ report.errors|length }}.
+    </div>
+
+    {% if report.errors %}
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-body fw-semibold">Строки, которые не были импортированы</div>
+        <ul class="list-group list-group-flush small">
+            {% for error in report.errors %}
+            <li class="list-group-item">Строка {{ error.line }}: {{ error.message }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="/transactions">К списку операций</a>
+        <a class="btn btn-outline-secondary" href="/import">Импортировать ещё</a>
+    </div>
+</div>
+</div>
+{% endblock %}
