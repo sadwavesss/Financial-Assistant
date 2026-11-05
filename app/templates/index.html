@@ -36,6 +36,33 @@
     </div></div></div>
 </div>
 
+{% if upcoming %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Ближайшие регулярные платежи (14 дней)</h2>
+            <a class="small" href="/recurring">Все регулярные →</a>
+        </div>
+        <ul class="list-group list-group-flush small">
+            {% for p in upcoming %}
+            {% set days = p.days_until_next(today) %}
+            <li class="list-group-item px-0 d-flex justify-content-between gap-2">
+                <span>
+                    {{ p.next_date|date_ru }} · {{ p.name }}
+                    <span class="text-body-secondary">
+                        ({% if days < 0 %}ожидался {{ -days }} дн. назад{% elif days == 0 %}сегодня{% else %}через {{ days }} дн.{% endif %})
+                    </span>
+                </span>
+                <span class="fw-semibold text-nowrap {{ 'text-success' if p.type.value == 'income' else '' }}">
+                    {{ "+" if p.type.value == "income" else "−" }}{{ p.typical_amount|money }} {{ p.currency.value }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
     {% set features = [
         ("Операции", "/transactions", "Ручной ввод и импорт операций из файла."),

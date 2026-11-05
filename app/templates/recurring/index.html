@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Регулярные платежи — {{ app_name }}{% endblock %}
+
+{% macro when(payment) -%}
+    {% set days = payment.days_until_next(report.today) %}
+    {% if days < 0 %}<span class="text-danger">ожидался {{ -days }} дн. назад</span>
+    {% elif days == 0 %}<span class="text-warning-emphasis">сегодня</span>
+    {% else %}через {{ days }} дн.{% endif %}
+{%- endmacro %}
+
+{% macro payments_table(items, show_next=True) %}
+<div class="table-responsive">
+<table class="table table-sm align-middle mb-0">
+    <thead class="table-light">
+    <tr>
+        <th>Название</th><th>Категория</th><th>Периодичность</th>
+        <th class="text-end">Обычная сумма</th><th class="text-end">В месяц, BYN</th>
+        <th>Последний</th>{% if show_next %}<th>Следующий</th>{% endif %}
+        <th class="text-end" title="Доля интервалов, совпавших с периодом">Регулярность</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for p in items %}
+    <tr>
+        <td>
+            <a class="text-reset" href="/transactions?search={{ p.name|urlencode }}">{{ p.name }}</a>
+            <div class="small text-body-secondary">{{ p.count }} оп. с {{ p.first_date|date_ru }}</div>
+        </td>
+        <td>
+            {% if p.category %}
+            <span class="badge rounded-pill category-badge" style="--category-color: {{ p.category.color }}">{{ p.category.name }}</span>
+            {% endif %}
+        </td>
+        <td>{{ periodicity_labels[p.periodicity] }}</td>
+        <td class="text-end text-nowrap">
+            {{ p.typical_amount|money }} {{ p.currency.value }}
+            <div class="small text-body-secondary">{{ "фиксированная" if p.fixed_amount else "переменная (±%.0f%%)"|format(p.amount_variation * 100) }}</div>
+        </td>
+        <td class="text-end text-nowrap fw-semibold">{{ p.monthly_cost_byn|money }}</td>
+        <td class="text-nowrap">{{ p.last_date|date_ru }}</td>
+        {% if show_next %}<td class="text-nowrap">{{ p.next_date|date_ru }}<div class="small">{{ when(p) }}</div></td>{% endif %}
+        <td class="text-end">{{ "%.0f"|format(p.regularity * 100) }}%</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-1">
+    <h1 class="h3 mb-0">Регулярные платежи</h1>
+    <form method="get" action="/recurring" class="d-flex align-items-center gap-2">
+        <label class="small text-body-secondary text-nowrap" for="months">Анализ за</label>
+        <select class="form-select form-select-sm" id="months" name="months" onchange="this.form.submit()">
+            {% for value in month_options %}
+            <option value="{{ value }}" {% if report.months == value %}selected{% endif %}>{{ value }} мес.</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+<p class="text-body-secondary small mb-3">
+    Операции с одинаковым описанием, которые повторяются с регулярным интервалом (неделя, месяц,
+    квартал, год) и почти одинаковой суммой. Следующая дата — прогноз по последнему платежу.
+</p>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Регулярные расходы в месяц</div>
+        <div class="fs-4 fw-semibold text-danger">{{ report.monthly_recurring_expense|money }} BYN</div>
+        <span class="small text-body-secondary">действующих платежей: {{ expenses|length }}</span>
+    </div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Доля в среднемесячных расходах</div>
+        <div class="fs-4 fw-semibold">
+            {% if report.recurring_share is not none %}{{ "%.1f"|format(report.recurring_share * 100) }}%{% else %}—{% endif %}
+        </div>
+        <span class="small text-body-secondary">в среднем расходы {{ report.average_monthly_expense|money }} BYN в месяц</span>
+    </div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Регулярные доходы в месяц</div>
+        <div class="fs-4 fw-semibold text-success">
+            {{ incomes|sum(attribute="monthly_cost_byn")|money }} BYN
+        </div>
+        <span class="small text-body-secondary">источников: {{ incomes|length }}</span>
+    </div></div></div>
+</div>
+
+{% if not report.payments %}
+<div class="alert alert-info">
+    Повторяющихся платежей не найдено. Нужно хотя бы три операции с одинаковым описанием и регулярным интервалом.
+</div>
+{% else %}
+
+{% if upcoming %}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <h2 class="h6">Ожидаются в ближайшие 30 дней</h2>
+        <ul class="list-group list-group-flush small">
+            {% for p in upcoming %}
+            <li class="list-group-item px-0 d-flex justify-content-between gap-2">
+                <span>{{ p.next_date|date_ru }} · {{ p.name }} <span class="text-body-secondary">({{ when(p) }})</span></span>
+                <span class="fw-semibold text-nowrap {{ 'text-success' if p.type.value == 'income' else '' }}">
+                    {{ "+" if p.type.value == "income" else "−" }}{{ p.typical_amount|money }} {{ p.currency.value }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% if expenses %}
+<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+    <h2 class="h6">Регулярные расходы</h2>
+    {{ payments_table(expenses) }}
+</div></div>
+{% endif %}
+
+{% if incomes %}
+<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+    <h2 class="h6">Регулярные доходы</h2>
+    {{ payments_table(incomes) }}
+</div></div>
+{% endif %}
+
+{% if stopped %}
+<div class="card border-0 shadow-sm"><div class="card-body">
+    <h2 class="h6">Прекратившиеся</h2>
+    <p class="small text-body-secondary">Платёж не поступал дольше обычного интервала — возможно, подписка отменена.</p>
+    {{ payments_table(stopped, show_next=False) }}
+</div></div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -4,7 +4,6 @@ All amounts are in BYN (`Transaction.amount_byn`). Every indicator is also calcu
 previous period of the same length, so changes can be shown ("expenses +12 % vs. before").
 """
 
-import calendar
 import datetime as dt
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -15,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Category, Transaction, TransactionType
 from app.services.errors import InvalidDataError
+from app.utils.dates import add_months
 
 ZERO = Decimal("0.00")
 CENT = Decimal("0.01")
@@ -167,7 +167,7 @@ def resolve_period(
         return Period(first or today, max(last or today, today))
     months_back = {PeriodPreset.MONTH: 0, PeriodPreset.MONTHS_3: 2, PeriodPreset.MONTHS_6: 5,
                    PeriodPreset.MONTHS_12: 11}[preset]  # fmt: skip
-    return Period(_add_months(month_start, -months_back), today)
+    return Period(add_months(month_start, -months_back), today)
 
 
 def auto_granularity(period: Period) -> Granularity:
@@ -306,7 +306,7 @@ def _next_bucket(start: dt.date, granularity: Granularity) -> dt.date:
     if granularity is Granularity.WEEK:
         return start + dt.timedelta(days=7)
     if granularity is Granularity.MONTH:
-        return _add_months(start, 1)
+        return add_months(start, 1)
     return start + dt.timedelta(days=1)
 
 
@@ -316,12 +316,6 @@ def _bucket_label(start: dt.date, granularity: Granularity) -> str:
     if granularity is Granularity.WEEK:
         return f"с {start:%d.%m}"
     return f"{start:%d.%m}"
-
-
-def _add_months(day: dt.date, months: int) -> dt.date:
-    index = day.year * 12 + day.month - 1 + months
-    year, month = divmod(index, 12)
-    return dt.date(year, month + 1, min(day.day, calendar.monthrange(year, month + 1)[1]))
 
 
 def _money(value: Decimal | None) -> Decimal:
