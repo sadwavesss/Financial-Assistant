@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика — {{ app_name }}{% endblock %}
+
+{# Change vs. the previous period; `good_when_up` decides the color (income up = good). #}
+{% macro change_badge(value, good_when_up=True) -%}
+    {% if value is none %}
+        <span class="small text-body-secondary">нет данных за прошлый период</span>
+    {% else %}
+        {% set up = value > 0 %}
+        {% set good = up == good_when_up %}
+        <span class="small {{ 'text-success' if good else 'text-danger' }}">
+            {{ "▲" if up else "▼" }} {{ "%.1f"|format((value * 100)|abs) }}% к прошлому периоду
+        </span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+{% set s, p = report.summary, report.previous_summary %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-0">Аналитика</h1>
+        <div class="text-body-secondary small">
+            {{ report.period.start|date_ru }} — {{ report.period.end|date_ru }} ({{ report.period.days }} дн.);
+            сравнение с {{ report.previous_period.start|date_ru }} — {{ report.previous_period.end|date_ru }}
+        </div>
+    </div>
+</div>
+
+{% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+
+{# ---------- Period selection ---------- #}
+<form class="card border-0 shadow-sm mb-3" method="get" action="/analytics">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-body-secondary" for="period">Период</label>
+            <select class="form-select" id="period" name="period">
+                {% for value, label in period_labels.items() %}
+                <option value="{{ value }}" {% if filters.period == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-body-secondary" for="date_from">С</label>
+            <input class="form-control" type="date" id="date_from" name="date_from" value="{{ filters.date_from or '' }}">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-body-secondary" for="date_to">По</label>
+            <input class="form-control" type="date" id="date_to" name="date_to" value="{{ filters.date_to or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-body-secondary" for="granularity">Детализация графика</label>
+            <select class="form-select" id="granularity" name="granularity">
+                <option value="">Автоматически</option>
+                {% for value, label in granularity_labels.items() %}
+                <option value="{{ value }}" {% if filters.granularity == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="submit">Показать</button>
+        </div>
+        <div class="col-12 small text-body-secondary">Даты учитываются при выборе «Свой период».</div>
+    </div>
+</form>
+
+{# ---------- Summary ---------- #}
+<div class="row g-3 mb-3">
+    <div class="col-md-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Доходы</div>
+        <div class="fs-4 fw-semibold text-success">{{ s.income|money }} BYN</div>
+        {{ change_badge(report.change(s.income, p.income), True) }}
+    </div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Расходы</div>
+        <div class="fs-4 fw-semibold text-danger">{{ s.expense|money }} BYN</div>
+        {{ change_badge(report.change(s.expense, p.expense), False) }}
+    </div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Баланс</div>
+        <div class="fs-4 fw-semibold {{ 'text-success' if s.balance >= 0 else 'text-danger' }}">{{ s.balance|money }} BYN</div>
+        <span class="small text-body-secondary">
+            {% if s.savings_rate is not none %}сбережено {{ "%.1f"|format(s.savings_rate * 100) }}% доходов{% else %}доходов не было{% endif %}
+        </span>
+    </div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Средний расход в день</div>
+        <div class="fs-4 fw-semibold">{{ report.average_daily_expense|money }} BYN</div>
+        <span class="small text-body-secondary">операций за период: {{ s.count }}</span>
+    </div></div></div>
+</div>
+
+{% if not s.count %}
+<div class="alert alert-info">За выбранный период операций нет. <a href="/import">Импортируйте</a> или <a href="/transactions/new">добавьте</a> операции.</div>
+{% else %}
+
+{# ---------- Charts ---------- #}
+<div class="row g-3 mb-3">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+            <h2 class="h6">Структура расходов</h2>
+            <div class="chart-box"><canvas id="structure-chart" aria-label="Структура расходов по категориям"></canvas></div>
+        </div></div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+            <h2 class="h6">Динамика доходов и расходов ({{ granularity_labels[report.granularity]|lower }})</h2>
+            <div class="chart-box"><canvas id="dynamics-chart" aria-label="Динамика доходов и расходов"></canvas></div>
+        </div></div>
+    </div>
+</div>
+
+{# ---------- Tables ---------- #}
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h6">Наиболее затратные категории</h2>
+                <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                    <tr><th>Категория</th><th class="text-end">Сумма, BYN</th><th style="width: 30%">Доля</th><th class="text-end">Изменение</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for item in report.expense_structure %}
+                    <tr>
+                        <td>
+                            <a class="text-reset text-decoration-none" href="/transactions?type=expense&date_from={{ report.period.start }}&date_to={{ report.period.end }}{% if item.category_id %}&category_id={{ item.category_id }}{% endif %}">
+                                <span class="legend-dot" style="background: {{ item.color }}"></span>{{ item.name }}
+                            </a>
+                            <span class="small text-body-secondary">· {{ item.count }} оп.</span>
+                        </td>
+                        <td class="text-end text-nowrap">{{ item.amount|money }}</td>
+                        <td>
+                            <div class="progress" role="progressbar" style="height: 0.5rem" aria-valuenow="{{ (item.share * 100)|round|int }}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: {{ item.share * 100 }}%; background: {{ item.color }}"></div>
+                            </div>
+                            <span class="small text-body-secondary">{{ "%.1f"|format(item.share * 100) }}%</span>
+                        </td>
+                        <td class="text-end text-nowrap small">
+                            {% if item.change is none %}
+                                <span class="text-body-secondary">новая</span>
+                            {% else %}
+                                <span class="{{ 'text-danger' if item.change > 0 else 'text-success' }}">
+                                    {{ "+" if item.change > 0 else "" }}{{ "%.0f"|format(item.change * 100) }}%
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h2 class="h6">Крупнейшие расходы</h2>
+                <ul class="list-group list-group-flush small">
+                    {% for item in report.top_expenses %}
+                    <li class="list-group-item px-0 d-flex justify-content-between gap-2">
+                        <span>
+                            <a class="text-reset" href="/transactions/{{ item.id }}/edit">{{ item.description or "—" }}</a>
+                            <span class="text-body-secondary d-block">{{ item.date|date_ru }}{% if item.category %} · {{ item.category.name }}{% endif %}</span>
+                        </span>
+                        <span class="fw-semibold text-nowrap">{{ item.amount_byn|money }} BYN</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="h6">Источники доходов</h2>
+                <ul class="list-group list-group-flush small">
+                    {% for item in report.income_structure %}
+                    <li class="list-group-item px-0 d-flex justify-content-between">
+                        <span><span class="legend-dot" style="background: {{ item.color }}"></span>{{ item.name }}</span>
+                        <span class="text-nowrap">{{ item.amount|money }} BYN <span class="text-body-secondary">({{ "%.0f"|format(item.share * 100) }}%)</span></span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item px-0 text-body-secondary">доходов за период нет</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="application/json" id="analytics-data">{{ chart_data|tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/analytics.js') }}"></script>
+{% endblock %}

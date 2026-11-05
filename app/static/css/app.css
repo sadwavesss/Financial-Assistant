@@ -8,6 +8,20 @@
     border-radius: 0.75rem;
 }
 
+/* Fixed-height container: Chart.js charts fill it instead of growing endlessly. */
+.chart-box {
+    position: relative;
+    height: 300px;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    margin-right: 0.4rem;
+}
+
 /* Category label tinted with the category's own color. */
 .category-badge {
     color: var(--category-color);
