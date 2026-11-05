@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.integrations.exchange_rates import RateProvider
 from app.models import Category, CategorySource, Currency, RateSource, Transaction, TransactionType
 from app.schemas.transaction import RateMode, TransactionFilters, TransactionIn
+from app.services.categorization import HybridCategorizer, apply_decision, mark_manual
 from app.services.errors import InvalidDataError, NotFoundError
 from app.services.exchange_rates import (
     RateUnavailableError,
@@ -77,7 +78,7 @@ def list_transactions(db: Session, filters: TransactionFilters) -> TransactionLi
 def create_transaction(
     db: Session, data: TransactionIn, providers: Sequence[RateProvider]
 ) -> Transaction:
-    category = _validate_category(db, data.category_id, data.type)
+    _validate_category(db, data.category_id, data.type)
     rate, rate_source = _resolve_rate(db, data, providers)
 
     transaction = Transaction(
@@ -89,9 +90,14 @@ def create_transaction(
         rate_source=rate_source,
         amount_byn=convert_to_byn(data.amount, rate),
         description=data.description,
-        category=category,
-        category_source=CategorySource.MANUAL if category else None,
     )
+    # A category chosen by the user is kept; otherwise the hybrid categorizer decides.
+    if data.category_id is not None:
+        mark_manual(transaction, data.category_id)
+    else:
+        apply_decision(
+            transaction, HybridCategorizer.from_db(db).categorize(data.description, data.type)
+        )
     db.add(transaction)
     db.commit()
     db.refresh(transaction)  # return values exactly as stored (Numeric scale, server defaults)
@@ -102,7 +108,7 @@ def update_transaction(
     db: Session, transaction_id: int, data: TransactionIn, providers: Sequence[RateProvider]
 ) -> Transaction:
     transaction = get_transaction(db, transaction_id)
-    category = _validate_category(db, data.category_id, data.type)
+    _validate_category(db, data.category_id, data.type)
 
     # Keep the stored rate if neither currency nor date changed and no other mode was requested.
     rate_unchanged = (
@@ -113,17 +119,24 @@ def update_transaction(
     if not rate_unchanged:
         transaction.exchange_rate, transaction.rate_source = _resolve_rate(db, data, providers)
 
-    # A category changed by the user is a manual correction (used later to train the classifier).
-    if transaction.category_id != data.category_id:
-        transaction.category = category
-        transaction.category_source = CategorySource.MANUAL if category else None
-
+    text_changed = (data.description, data.type) != (transaction.description, transaction.type)
     transaction.date = data.date
     transaction.type = data.type
     transaction.amount = data.amount
     transaction.currency = data.currency
     transaction.amount_byn = convert_to_byn(data.amount, transaction.exchange_rate)
     transaction.description = data.description
+
+    if data.category_id is not None and data.category_id != transaction.category_id:
+        # A category changed by the user is a manual correction, used to train the classifier.
+        mark_manual(transaction, data.category_id)
+    elif data.category_id is None or (
+        text_changed and transaction.category_source is not CategorySource.MANUAL
+    ):
+        # "Определить автоматически" was chosen, or an automatic category may be outdated.
+        apply_decision(
+            transaction, HybridCategorizer.from_db(db).categorize(data.description, data.type)
+        )
     db.commit()
     db.refresh(transaction)
     return transaction
@@ -185,6 +198,8 @@ def _apply_filters(query: Select, filters: TransactionFilters) -> Select:
         query = query.where(Transaction.type == filters.type)
     if filters.category_id:
         query = query.where(Transaction.category_id == filters.category_id)
+    if filters.needs_review is not None:
+        query = query.where(Transaction.needs_review == filters.needs_review)
     if filters.search and (needle := normalize_text(filters.search)):
         escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.where(Transaction.description_normalized.like(f"%{escaped}%", escape="\\"))

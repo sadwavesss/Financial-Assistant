@@ -14,6 +14,7 @@ from app.models import Currency, Transaction, TransactionType
 from app.schemas.transaction import RateMode, TransactionFilters, TransactionIn
 from app.services import transactions as service
 from app.services.categories import list_categories
+from app.services.categorization import model_status
 from app.services.errors import InvalidDataError
 from app.services.exchange_rates import RateQuote, RateUnavailableError
 from app.utils.validation import humanize_errors
@@ -51,6 +52,7 @@ def transaction_list(request: Request, db: DbSession) -> HTMLResponse:
             "errors": errors,
             "filter_query": filter_query,
             "categories": list_categories(db),
+            "review_count": model_status(db).needs_review,
             "message": MESSAGES.get(request.query_params.get("message", "")),
         },
     )

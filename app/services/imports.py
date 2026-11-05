@@ -24,11 +24,16 @@ from app.importers import ImportFileError, ParsedRow, RowError, StatementImporte
 from app.integrations.exchange_rates import RateProvider
 from app.models import (
     Category,
-    CategorySource,
     Currency,
     RateSource,
     Transaction,
     TransactionType,
+)
+from app.services.categorization import (
+    Decision,
+    HybridCategorizer,
+    apply_decision,
+    mark_manual,
 )
 from app.services.exchange_rates import RateUnavailableError, convert_to_byn, get_rate
 from app.utils.text import normalize_text
@@ -45,9 +50,10 @@ class PreviewRow:
     line: int
     status: RowStatus
     row: ParsedRow | None = None
-    category: Category | None = None
+    category: Category | None = None  # category given in the file
     import_hash: str | None = None
     message: str | None = None  # error text or a warning for a new row
+    decision: Decision | None = None  # automatic category for a new row without one
 
 
 @dataclass
@@ -97,9 +103,18 @@ def preview_import(db: Session, content: bytes, importer: StatementImporter) -> 
             category = categories.get((normalize_text(row.category_name), row.data.type))
             if category is None:
                 warning = (
-                    f"Категория «{row.category_name}» не найдена — операция будет без категории"
+                    f"Категория «{row.category_name}» не найдена — будет определена автоматически"
                 )
         rows.append(PreviewRow(row.line, RowStatus.NEW, row, category, import_hash, warning))
+
+    # Rows without a (known) category get one from the hybrid categorizer, in one batch.
+    automatic = [item for item in rows if item.status is RowStatus.NEW and item.category is None]
+    if automatic:
+        decisions = HybridCategorizer.from_db(db).categorize_many(
+            [(item.row.data.description, item.row.data.type) for item in automatic]
+        )
+        for item, decision in zip(automatic, decisions, strict=True):
+            item.decision = decision
 
     rows.sort(key=lambda item: item.line)
     return ImportPreview(rows)
@@ -136,21 +151,23 @@ def run_import(
             )
             continue
         rate, rate_source = rate_info or (Decimal(1), None)
-        db.add(
-            Transaction(
-                date=data.date,
-                type=data.type,
-                amount=data.amount,
-                currency=data.currency,
-                exchange_rate=rate,
-                rate_source=rate_source,
-                amount_byn=convert_to_byn(data.amount, rate),
-                description=data.description,
-                category=item.category,
-                category_source=CategorySource.MANUAL if item.category else None,
-                import_hash=item.import_hash,
-            )
+        transaction = Transaction(
+            date=data.date,
+            type=data.type,
+            amount=data.amount,
+            currency=data.currency,
+            exchange_rate=rate,
+            rate_source=rate_source,
+            amount_byn=convert_to_byn(data.amount, rate),
+            description=data.description,
+            import_hash=item.import_hash,
         )
+        # A category from the file counts as the user's choice; otherwise use the automatic one.
+        if item.category is not None:
+            mark_manual(transaction, item.category.id)
+        elif item.decision is not None:
+            apply_decision(transaction, item.decision)
+        db.add(transaction)
         report.created += 1
 
     db.commit()

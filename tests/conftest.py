@@ -1,6 +1,7 @@
 """Shared test fixtures: an isolated in-memory database, fake rate sources and an HTTP client."""
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,13 +9,27 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import models  # noqa: F401  (registers all ORM models in Base.metadata)
+from app import (
+    config,
+    models,  # noqa: F401  (registers all ORM models in Base.metadata)
+)
 from app.database import Base, build_engine, get_db
 from app.dependencies import get_rate_providers
 from app.main import app
 from app.models import RateSource
+from app.services import categorization
 from app.services.categories import seed_default_categories
 from tests.helpers import ONLINE_SOURCES, FakeRateProvider
+
+
+@pytest.fixture(autouse=True)
+def isolated_models_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Trained models are written to a temporary folder, never to the real data/models."""
+    models_dir = tmp_path / "models"
+    monkeypatch.setattr(config, "MODELS_DIR", models_dir)
+    categorization._model_cache.clear()
+    yield models_dir
+    categorization._model_cache.clear()
 
 
 @pytest.fixture

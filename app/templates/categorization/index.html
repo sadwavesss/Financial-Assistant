@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% from "partials/trace.html" import decision_trace %}
+
+{% block title %}Категоризация — {{ app_name }}{% endblock %}
+
+{% macro percent(value) %}{{ "%.1f"|format(value * 100) }}%{% endmacro %}
+
+{% block content %}
+<h1 class="h3 mb-1">Гибридная категоризация</h1>
+<p class="text-body-secondary small mb-3">
+    Категория операции определяется каскадом: база знаний (ключевые слова) → ML-модель
+    (TF-IDF по символьным n-граммам + логистическая регрессия) → арбитр, который сравнивает
+    результаты и помечает сомнительные решения для проверки.
+</p>
+
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="row g-3 mb-4">
+    {# ---------- Model status ---------- #}
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">ML-модель</h2>
+                {% set model = status.classifier %}
+                {% if model %}
+                <dl class="row small mb-3">
+                    <dt class="col-7 fw-normal text-body-secondary">Обучена</dt>
+                    <dd class="col-5 mb-1">{{ model.info.trained_at.replace("T", " ") }}</dd>
+                    <dt class="col-7 fw-normal text-body-secondary">Операций в обучении</dt>
+                    <dd class="col-5 mb-1">{{ model.info.samples }}</dd>
+                    <dt class="col-7 fw-normal text-body-secondary">Категорий</dt>
+                    <dd class="col-5 mb-1">{{ model.info.classes }}</dd>
+                    <dt class="col-7 fw-normal text-body-secondary">Доступно размеченных сейчас</dt>
+                    <dd class="col-5 mb-1">{{ status.available_samples }}</dd>
+                </dl>
+                {% else %}
+                <p class="small text-warning-emphasis">
+                    Модель ещё не обучена — работают только правила. Доступно размеченных операций:
+                    {{ status.available_samples }}.
+                </p>
+                {% endif %}
+                <p class="small text-body-secondary">
+                    Обучение — на категориях, выбранных вручную, и на бесспорных решениях правил.
+                    Собственные предсказания модели в обучение не попадают.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <form method="post" action="/categorization/train">
+                        <button class="btn btn-primary btn-sm" type="submit">{{ "Переобучить" if model else "Обучить" }} модель</button>
+                    </form>
+                    <form method="post" action="/categorization/recategorize"
+                          data-confirm="Пересчитать категории всех операций, кроме выбранных вручную?">
+                        <button class="btn btn-outline-primary btn-sm" type="submit">Перекатегоризировать операции</button>
+                    </form>
+                </div>
+                {% if status.needs_review %}
+                <a class="d-inline-block small mt-3" href="/transactions?needs_review=true">
+                    ⚠ Требуют проверки: {{ status.needs_review }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ---------- Try a description ---------- #}
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">Проверить описание</h2>
+                <form class="row g-2 mb-3" method="get" action="/categorization">
+                    <div class="col-md-7">
+                        <input class="form-control" name="description" maxlength="255" required
+                               placeholder="Например: EVROOPT MINSK" value="{{ description }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="type">
+                            {% for value, label in type_labels.items() %}
+                            <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Проверить</button></div>
+                </form>
+                {% if decision %}
+                <div class="mb-2">
+                    Результат: <span class="fw-semibold">{{ decision.trace.steps[2].category or "—" }}</span>
+                    {% if decision.needs_review %}<span class="badge text-bg-warning ms-1">требует проверки</span>{% endif %}
+                </div>
+                {{ decision_trace(decision.trace) }}
+                {% else %}
+                <p class="small text-body-secondary mb-0">
+                    Введите описание операции, чтобы увидеть пошаговый протокол решения. Ничего не сохраняется.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---------- Evaluation ---------- #}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 mb-0">Сравнение подходов</h2>
+            <form method="post" action="/categorization/evaluate">
+                <button class="btn btn-outline-primary btn-sm" type="submit">Выполнить оценку</button>
+            </form>
+        </div>
+        <p class="small text-body-secondary">
+            Эталон — операции с категориями, проставленными вручную. Модель обучается только на
+            обучающей части; три варианта используют одного и того же арбитра и отличаются лишь
+            набором включённых компонентов. Покрытие — доля операций, получивших категорию
+            не «Прочие».
+        </p>
+        {% if report %}
+        <p class="small mb-2">Выполнена {{ report.created_at.replace("T", " ") }}, размеченных операций: {{ report.samples }}.</p>
+        {% for scenario in report.scenarios %}
+        {% set best = scenario.variants|map(attribute="accuracy")|max %}
+        <h3 class="h6 mt-3">{{ scenario_labels[scenario.scenario] }}
+            <span class="text-body-secondary fw-normal small">(обучение {{ scenario.train_size }}, тест {{ scenario.test_size }})</span>
+        </h3>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Вариант</th><th class="text-end">Точность</th><th class="text-end">Покрытие</th>
+                    <th class="text-end">Точность на покрытых</th><th class="text-end">Macro-F1</th>
+                    <th class="text-end">мс / операция</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for v in scenario.variants %}
+                <tr class="{{ 'table-success' if v.accuracy == best else '' }}">
+                    <td>{{ variant_labels[v.variant] }}</td>
+                    <td class="text-end">{{ percent(v.accuracy) }}</td>
+                    <td class="text-end">{{ percent(v.coverage) }}</td>
+                    <td class="text-end">{{ percent(v.precision_covered) }}</td>
+                    <td class="text-end">{{ "%.3f"|format(v.macro_f1) }}</td>
+                    <td class="text-end">{{ "%.3f"|format(v.ms_per_item) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="small text-body-secondary mb-0">Оценка ещё не выполнялась.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/confirm.js') }}"></script>
+{% endblock %}

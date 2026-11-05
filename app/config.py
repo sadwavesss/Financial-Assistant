@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BASE_DIR / "app"
 DATA_DIR = BASE_DIR / "data"
 IMPORTS_DIR = DATA_DIR / "imports"  # uploaded files waiting for the user's confirmation
+MODELS_DIR = DATA_DIR / "models"  # trained machine learning models and their metadata
 TEMPLATES_DIR = APP_DIR / "templates"
 STATIC_DIR = APP_DIR / "static"
 
@@ -29,6 +30,10 @@ class Settings(BaseSettings):
     rate_request_timeout_seconds: float = 5.0
     # How far (in days) a rate from the system's own history may be from the operation date.
     rate_history_max_days: int = Field(default=7, ge=0)
+    # Hybrid categorization: the classifier is trusted from this confidence on (no rule matched)...
+    ml_min_confidence: float = Field(default=0.6, ge=0, le=1)
+    # ...and a disagreement with a rule from this confidence on is reported as a conflict.
+    ml_conflict_confidence: float = Field(default=0.8, ge=0, le=1)
     # Limits of one imported file.
     import_max_bytes: int = 5 * 1024 * 1024
     import_max_rows: int = 10_000

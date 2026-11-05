@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/trace.html" import source_hint %}
 
 {% block title %}Операции — {{ app_name }}{% endblock %}
 
@@ -57,6 +58,15 @@
             <button class="btn btn-outline-primary flex-fill" type="submit">Найти</button>
             <a class="btn btn-outline-secondary" href="/transactions" title="Сбросить фильтры">✕</a>
         </div>
+        <div class="col-12">
+            <div class="form-check form-check-inline small mb-0">
+                <input class="form-check-input" type="checkbox" id="needs_review" name="needs_review"
+                       value="true" {% if filters.needs_review == "true" %}checked{% endif %}>
+                <label class="form-check-label" for="needs_review">
+                    Только требующие проверки{% if review_count %} ({{ review_count }}){% endif %}
+                </label>
+            </div>
+        </div>
         {% for message in errors.values() %}
         <div class="col-12 text-danger small">{{ message }}</div>
         {% endfor %}
@@ -113,6 +123,7 @@
                     <span class="badge rounded-pill category-badge" style="--category-color: {{ item.category.color }}">
                         {{ item.category.name }}
                     </span>
+                    <div>{{ source_hint(item) }}</div>
                     {% else %}
                     <span class="text-body-secondary small">без категории</span>
                     {% endif %}

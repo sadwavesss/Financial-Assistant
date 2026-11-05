@@ -87,7 +87,12 @@ def test_category_from_file_is_matched_by_name(
         "Продукты",
         CategorySource.MANUAL,
     )
-    assert (unknown.category, unknown.category_source) == (None, None)
+    # Unknown category in the file -> automatic categorization (no rule, no model -> fallback).
+    assert (unknown.category.name, unknown.category_source) == (
+        "Прочие расходы",
+        CategorySource.FALLBACK,
+    )
+    assert unknown.needs_review
 
 
 def test_category_of_wrong_type_is_not_assigned(seeded_db: Session) -> None:

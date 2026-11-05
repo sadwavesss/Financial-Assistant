@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/trace.html" import decision_trace %}
 
 {% set title = "Изменение операции" if transaction else "Новая операция" %}
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
@@ -114,7 +115,7 @@
             <div class="col-md-5">
                 <label class="form-label" for="category_id">Категория</label>
                 <select class="form-select {% if errors.category_id %}is-invalid{% endif %}" id="category_id" name="category_id">
-                    <option value="">Без категории</option>
+                    <option value="">Определить автоматически</option>
                     {% for category in categories %}
                     <option value="{{ category.id }}" data-type="{{ category.type.value }}"
                             {% if form.category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>
@@ -129,6 +130,21 @@
                        placeholder="Например: Евроопт, продукты" value="{{ form.description or '' }}">
                 {{ field_error("description") }}
             </div>
+
+            {% if transaction and transaction.categorization_trace %}
+            <div class="col-12">
+                <details {% if transaction.needs_review %}open{% endif %}>
+                    <summary class="small fw-semibold {{ 'text-warning-emphasis' if transaction.needs_review else 'text-body-secondary' }}">
+                        Как была определена категория{% if transaction.needs_review %} — требует проверки{% endif %}
+                    </summary>
+                    <div class="mt-2">{{ decision_trace(transaction.categorization_trace) }}</div>
+                    <div class="small text-body-secondary mt-2">
+                        Если категория неверна — выберите правильную: исправление сохранится как
+                        ручное и будет использовано при следующем обучении модели.
+                    </div>
+                </details>
+            </div>
+            {% endif %}
         </div>
         <div class="card-footer bg-body d-flex justify-content-end gap-2 py-3">
             <a class="btn btn-outline-secondary" href="/transactions">Отмена</a>

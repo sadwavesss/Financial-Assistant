@@ -21,6 +21,7 @@ class CategorySource(StrEnum):
     MANUAL = "manual"  # chosen by the user
     RULE = "rule"  # matched a keyword rule
     ML = "ml"  # predicted by the classifier
+    FALLBACK = "fallback"  # nothing reliable: the system category "Прочие ..." was used
 
 
 class RateSource(StrEnum):

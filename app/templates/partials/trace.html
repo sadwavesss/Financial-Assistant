@@ -1,0 +1,51 @@
+{# Step-by-step protocol of a hybrid categorization decision (see Decision.trace). #}
+{% macro decision_trace(trace) %}
+{% set rules, ml, arbiter = trace.steps %}
+<ol class="list-group list-group-numbered small">
+    <li class="list-group-item">
+        <span class="fw-semibold">База знаний (правила):</span>
+        {% if rules.result %}
+            {% for item in rules.result %}
+            <span class="badge text-bg-light border">«{{ item.keyword }}» → {{ item.category }}</span>
+            {% endfor %}
+        {% else %}
+            <span class="text-body-secondary">ни одно ключевое слово не найдено</span>
+        {% endif %}
+    </li>
+    <li class="list-group-item">
+        <span class="fw-semibold">ML-модель:</span>
+        {% if ml.result %}
+            {% for alt in ml.result.alternatives %}
+            <span class="badge {{ 'text-bg-primary' if loop.first else 'text-bg-light border' }}">
+                {{ alt.category }} {{ (alt.confidence * 100)|round|int }}%
+            </span>
+            {% endfor %}
+        {% else %}
+            <span class="text-body-secondary">{{ ml.note or "нет предсказания" }}</span>
+        {% endif %}
+    </li>
+    <li class="list-group-item">
+        <span class="fw-semibold">Арбитр:</span> {{ arbiter.category or "—" }}.
+        <span class="text-body-secondary">{{ arbiter.reason }}</span>
+        <div class="text-body-secondary mt-1">
+            Пороги: уверенность модели ≥ {{ (trace.thresholds.ml_min_confidence * 100)|int }}%,
+            конфликт с правилом при ≥ {{ (trace.thresholds.ml_conflict_confidence * 100)|int }}%.
+        </div>
+    </li>
+</ol>
+{% endmacro %}
+
+{# Short label of how the category was assigned, shown under the category badge. #}
+{% macro source_hint(item) %}
+{% set source = item.category_source.value if item.category_source else None %}
+{% if item.needs_review %}
+    <span class="text-warning-emphasis small" title="Автоматическое решение сомнительно — проверьте категорию">⚠ проверить</span>
+{% elif source == "rule" and item.categorization_trace %}
+    {% set rules = item.categorization_trace.steps[0].result %}
+    <span class="text-body-secondary small">правило{% if rules %} «{{ rules[0].keyword }}»{% endif %}</span>
+{% elif source == "ml" %}
+    <span class="text-body-secondary small">ML {{ ((item.category_confidence or 0) * 100)|round|int }}%</span>
+{% elif source == "manual" %}
+    <span class="text-body-secondary small">вручную</span>
+{% endif %}
+{% endmacro %}

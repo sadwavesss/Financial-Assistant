@@ -13,6 +13,8 @@ from app.database import SessionLocal
 from app.dependencies import get_rate_providers
 from app.importers import get_importer
 from app.services.categories import seed_default_categories
+from app.services.categorization import recategorize_all, train_classifier
+from app.services.categorization_eval import SCENARIO_LABELS, VARIANT_LABELS, evaluate
 from app.services.demo_data import generate_demo_rows, write_demo_csv
 from app.services.imports import run_import
 
@@ -49,6 +51,39 @@ def demo_data(args: argparse.Namespace) -> None:
         print(f"  строка {error.line}: {error.message}")
 
 
+def train_categorizer(_args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        classifier = train_classifier(db)
+    info = classifier.info
+    print(f"Модель обучена: {info.samples} операций, {info.classes} категорий ({info.trained_at}).")
+
+
+def recategorize(_args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        report = recategorize_all(db)
+    print(
+        f"Обработано: {report.processed}, изменилась категория: {report.changed}, "
+        f"требуют проверки: {report.needs_review}."
+    )
+
+
+def evaluate_categorizer(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        report = evaluate(db, seed=args.seed)
+    print(f"Размеченных операций: {report.samples}, seed={report.seed}")
+    for scenario in report.scenarios:
+        print(
+            f"\n{SCENARIO_LABELS[scenario.scenario]} "
+            f"(обучение {scenario.train_size}, тест {scenario.test_size})"
+        )
+        print(f"{'Вариант':16}{'Точность':>10}{'Покрытие':>10}{'Точн.покр.':>12}{'Macro-F1':>10}")
+        for v in scenario.variants:
+            print(
+                f"{VARIANT_LABELS[v.variant]:16}{v.accuracy:>10.3f}{v.coverage:>10.3f}"
+                f"{v.precision_covered:>12.3f}{v.macro_f1:>10.3f}"
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="Финансовый ассистент")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -71,6 +106,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo.add_argument("--load", action="store_true", help="сразу импортировать файл в базу данных")
     demo.set_defaults(handler=demo_data)
+
+    train = subparsers.add_parser("train-categorizer", help="обучить ML-модель категоризации")
+    train.set_defaults(handler=train_categorizer)
+
+    recat = subparsers.add_parser(
+        "recategorize", help="перекатегоризировать операции без ручной категории"
+    )
+    recat.set_defaults(handler=recategorize)
+
+    evaluation = subparsers.add_parser(
+        "evaluate-categorizer", help="сравнить: только правила / только ML / гибрид"
+    )
+    evaluation.add_argument("--seed", type=int, default=42, help="зерно разбиения на выборки")
+    evaluation.set_defaults(handler=evaluate_categorizer)
     return parser
 
 

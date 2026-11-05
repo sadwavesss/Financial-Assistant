@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Категории — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <h1 class="h3 mb-0">Категории и правила</h1>
+</div>
+<p class="text-body-secondary small mb-3">
+    База знаний категоризации: если описание операции содержит ключевое слово (целым словом,
+    без учёта регистра и «ё»), операция относится к его категории. Остальные случаи решает ML-модель.
+</p>
+
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<form class="card border-0 shadow-sm mb-4" method="post" action="/categories">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label small text-body-secondary" for="new-name">Новая категория</label>
+            <input class="form-control" id="new-name" name="name" maxlength="64" required placeholder="Название">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-body-secondary" for="new-type">Тип</label>
+            <select class="form-select" id="new-type" name="type">
+                {% for value, label in type_labels.items() %}
+                <option value="{{ value }}" {% if value == "expense" %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-body-secondary" for="new-color">Цвет</label>
+            <input class="form-control form-control-color w-100" type="color" id="new-color" name="color" value="#5c6bc0">
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="submit">Добавить</button>
+        </div>
+    </div>
+</form>
+
+{% for kind, items in groups %}
+<h2 class="h5 mb-3">{{ "Расходы" if kind.value == "expense" else "Доходы" }}</h2>
+<div class="row g-3 mb-4">
+    {% for category in items %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <form class="d-flex gap-2 align-items-center mb-2" method="post" action="/categories/{{ category.id }}/edit">
+                    <input class="form-control form-control-color flex-shrink-0" type="color" name="color"
+                           value="{{ category.color }}" title="Цвет">
+                    <input class="form-control form-control-sm fw-semibold" name="name" value="{{ category.name }}"
+                           maxlength="64" required aria-label="Название">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit" title="Сохранить">✓</button>
+                </form>
+                <div class="small text-body-secondary mb-2">
+                    Операций: {{ counts.get(category.id, 0) }}
+                    {% if category.is_system %}· системная (для нераспознанных операций){% endif %}
+                </div>
+
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    {% for rule in category.rules %}
+                    <form method="post" action="/rules/{{ rule.id }}/delete" class="d-inline">
+                        <span class="badge rounded-pill category-badge" style="--category-color: {{ category.color }}">
+                            {{ rule.keyword }}
+                            <button class="btn btn-link btn-sm p-0 ms-1 align-baseline text-reset text-decoration-none"
+                                    type="submit" title="Удалить ключевое слово">×</button>
+                        </span>
+                    </form>
+                    {% else %}
+                    <span class="small text-body-secondary">ключевых слов нет</span>
+                    {% endfor %}
+                </div>
+
+                <form class="input-group input-group-sm" method="post" action="/categories/{{ category.id }}/rules">
+                    <input class="form-control" name="keyword" maxlength="100" required placeholder="Новое ключевое слово">
+                    <button class="btn btn-outline-primary" type="submit">+</button>
+                </form>
+            </div>
+            {% if not category.is_system %}
+            <div class="card-footer bg-body border-0 pt-0 text-end">
+                <form method="post" action="/categories/{{ category.id }}/delete"
+                      data-confirm="Удалить категорию «{{ category.name }}» и её ключевые слова? Операции останутся без категории.">
+                    <button class="btn btn-sm btn-link text-danger p-0" type="submit">Удалить категорию</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/confirm.js') }}"></script>
+{% endblock %}

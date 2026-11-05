@@ -3,7 +3,7 @@
 import datetime as dt
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -78,6 +78,9 @@ class TransactionOut(BaseModel):
     description: str
     category: CategoryBrief | None
     category_source: CategorySource | None
+    category_confidence: float | None
+    needs_review: bool
+    categorization_trace: dict[str, Any] | None
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -87,6 +90,7 @@ class TransactionFilters(BaseModel):
     date_to: dt.date | None = None
     type: TransactionType | None = None
     category_id: int | None = None
+    needs_review: bool | None = None
     search: str | None = Field(default=None, max_length=100)
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=200)

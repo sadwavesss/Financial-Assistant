@@ -12,6 +12,8 @@
 ## Commands
 - Init DB (migrations + default categories): `.\.venv\Scripts\python.exe -m app.cli init-db`
 - Demo data: `.\.venv\Scripts\python.exe -m app.cli demo-data [--load] [--months N] [--seed S]`
+- Categorizer: `python -m app.cli train-categorizer | recategorize | evaluate-categorizer`
+  (model and evaluation report are stored in `data/models/`, not in git)
 - Run app: `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload`
 - Tests: `.\.venv\Scripts\python.exe -m pytest`
 - Lint: `.\.venv\Scripts\python.exe -m ruff check .`
@@ -25,6 +27,10 @@
   External HTTP APIs live in `integrations/`; shared FastAPI deps in `app/dependencies.py`.
 - Business errors: raise `ServiceError` subclasses (`app/services/errors.py`) with Russian
   messages; a global handler turns them into JSON (`/api`) or an HTML error page.
+- Categorization code: `services/rule_matcher.py` (symbolic), `ml/text_classifier.py`
+  (statistical), `services/categorization.py` (arbiter, trace, training),
+  `services/categorization_eval.py` (rules vs ML vs hybrid). Tests use a temporary
+  `config.MODELS_DIR` (autouse fixture `isolated_models_dir`).
 - Tests never use the network: rate sources are replaced by `tests/helpers.FakeRateProvider`
   (fixtures `providers` / `offline_providers`), HTTP parsing is tested with `httpx.MockTransport`.
 - Money is stored as `Decimal` / `Numeric(12, 2)`, never `float`.

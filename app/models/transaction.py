@@ -2,9 +2,9 @@
 
 import datetime as dt
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.database import Base
@@ -50,6 +50,13 @@ class Transaction(TimestampMixin, Base):
     category_source: Mapped[CategorySource | None] = mapped_column(
         enum_type(CategorySource, "category_source")
     )
+    # Confidence of the automatic decision (0..1); NULL for manual categories.
+    category_confidence: Mapped[float | None]
+    # The automatic decision is doubtful (conflict, low confidence): the user should check it.
+    needs_review: Mapped[bool] = mapped_column(default=False, server_default=false(), index=True)
+    # Step-by-step protocol of the automatic decision (rules, model, arbitration), see
+    # app.services.categorization.Decision.trace.
+    categorization_trace: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # Fingerprint of an imported row; prevents importing the same operation twice.
     import_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
