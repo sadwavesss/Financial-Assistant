@@ -12,6 +12,8 @@
 ## Commands
 - Init DB (migrations + default categories): `.\.venv\Scripts\python.exe -m app.cli init-db`
 - Demo data: `.\.venv\Scripts\python.exe -m app.cli demo-data [--load] [--months N] [--seed S]`
+- Forecast: `python -m app.cli forecast [--granularity week] [--horizon N]`
+  (models in `app/ml/forecasting.py`, series and report in `app/services/forecast.py`)
 - Categorizer: `python -m app.cli train-categorizer | recategorize | evaluate-categorizer`
   (model and evaluation report are stored in `data/models/`, not in git)
 - Run app: `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload`

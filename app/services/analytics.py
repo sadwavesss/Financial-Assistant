@@ -259,22 +259,22 @@ def _dynamics(db: Session, period: Period, granularity: Granularity) -> list[Buc
     ).all()
     sums: dict[dt.date, dict[TransactionType, Decimal]] = {}
     for day, kind, amount in rows:
-        bucket = sums.setdefault(_bucket_start(day, granularity), {})
+        bucket = sums.setdefault(bucket_start(day, granularity), {})
         bucket[kind] = bucket.get(kind, ZERO) + amount
 
     buckets = []
-    start = _bucket_start(period.start, granularity)
+    start = bucket_start(period.start, granularity)
     while start <= period.end:  # every bucket of the period, including empty ones
         values = sums.get(start, {})
         buckets.append(
             Bucket(
                 start=start,
-                label=_bucket_label(start, granularity),
+                label=bucket_label(start, granularity),
                 income=_money(values.get(TransactionType.INCOME)),
                 expense=_money(values.get(TransactionType.EXPENSE)),
             )
         )
-        start = _next_bucket(start, granularity)
+        start = next_bucket(start, granularity)
     return buckets
 
 
@@ -294,7 +294,7 @@ def _top_expenses(db: Session, period: Period, limit: int) -> list[Transaction]:
 MONTHS_SHORT = ("янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек")
 
 
-def _bucket_start(day: dt.date, granularity: Granularity) -> dt.date:
+def bucket_start(day: dt.date, granularity: Granularity) -> dt.date:
     if granularity is Granularity.WEEK:
         return day - dt.timedelta(days=day.weekday())  # Monday
     if granularity is Granularity.MONTH:
@@ -302,7 +302,7 @@ def _bucket_start(day: dt.date, granularity: Granularity) -> dt.date:
     return day
 
 
-def _next_bucket(start: dt.date, granularity: Granularity) -> dt.date:
+def next_bucket(start: dt.date, granularity: Granularity) -> dt.date:
     if granularity is Granularity.WEEK:
         return start + dt.timedelta(days=7)
     if granularity is Granularity.MONTH:
@@ -310,7 +310,7 @@ def _next_bucket(start: dt.date, granularity: Granularity) -> dt.date:
     return start + dt.timedelta(days=1)
 
 
-def _bucket_label(start: dt.date, granularity: Granularity) -> str:
+def bucket_label(start: dt.date, granularity: Granularity) -> str:
     if granularity is Granularity.MONTH:
         return f"{MONTHS_SHORT[start.month - 1]} {start.year}"
     if granularity is Granularity.WEEK:

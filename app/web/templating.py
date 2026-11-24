@@ -38,4 +38,13 @@ templates.env.globals.update(
     rate_source_labels=RATE_SOURCE_LABELS,
     category_source_labels=CATEGORY_SOURCE_LABELS,
 )
-templates.env.filters.update(money=format_money, rate=format_rate, date_ru=format_date)
+
+
+def format_money_float(value: float | None) -> str:
+    """Same as `money` for float values coming from statistical models."""
+    return format_money(Decimal(str(round(value, 2)))) if value is not None else ""
+
+
+templates.env.filters.update(
+    money=format_money, money_float=format_money_float, rate=format_rate, date_ru=format_date
+)

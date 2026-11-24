@@ -12,10 +12,12 @@ from app.config import BASE_DIR, DATA_DIR
 from app.database import SessionLocal
 from app.dependencies import get_rate_providers
 from app.importers import get_importer
+from app.services.analytics import Granularity
 from app.services.categories import seed_default_categories
 from app.services.categorization import recategorize_all, train_classifier
 from app.services.categorization_eval import SCENARIO_LABELS, VARIANT_LABELS, evaluate
 from app.services.demo_data import generate_demo_rows, write_demo_csv
+from app.services.forecast import build_forecast
 from app.services.imports import run_import
 
 DEFAULT_DEMO_FILE = DATA_DIR / "samples" / "demo_transactions.csv"
@@ -84,6 +86,21 @@ def evaluate_categorizer(args: argparse.Namespace) -> None:
             )
 
 
+def forecast_expenses(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        report = build_forecast(db, Granularity(args.granularity), args.horizon)
+    result = report.result
+    print(f"Бэктест на {result.test_points} последних периодах ({len(report.history)} в истории):")
+    print(f"{'Модель':26}{'MAE, BYN':>10}{'MAPE':>8}")
+    for score in result.scores:
+        mape = f"{score.mape:.1%}" if score.mape is not None else "—"
+        mark = "  ← выбрана" if score is result.best else ""
+        print(f"{score.label:26}{score.mae:>10.2f}{mape:>8}{mark}")
+    print("\nПрогноз (80% интервал):")
+    for point in report.points:
+        print(f"  {point.label:12}{point.value:>10.2f}  [{point.lower:.2f} … {point.upper:.2f}]")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="Финансовый ассистент")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -120,6 +137,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluation.add_argument("--seed", type=int, default=42, help="зерно разбиения на выборки")
     evaluation.set_defaults(handler=evaluate_categorizer)
+
+    fc = subparsers.add_parser("forecast", help="прогноз расходов и сравнение моделей")
+    fc.add_argument("--granularity", choices=["month", "week"], default="month")
+    fc.add_argument("--horizon", type=int, default=None, help="число периодов вперёд")
+    fc.set_defaults(handler=forecast_expenses)
     return parser
 
 

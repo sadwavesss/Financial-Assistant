@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Прогноз — {{ app_name }}{% endblock %}
+
+{% macro byn(value) %}{{ value|round(2)|money_float }} BYN{% endmacro %}
+
+{% block content %}
+<h1 class="h3 mb-1">Прогноз расходов</h1>
+<p class="text-body-secondary small mb-3">
+    Три модели сравниваются на истории: каждая предсказывает последние периоды, обучаясь только
+    на предшествующих данных. Для прогноза выбирается модель с наименьшей средней абсолютной
+    ошибкой (MAE). Затенённая область — интервал, в который фактические расходы попадают
+    примерно в 80 % случаев.
+</p>
+
+<form class="card border-0 shadow-sm mb-3" method="get" action="/forecast">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-body-secondary" for="granularity">Детализация</label>
+            <select class="form-select" id="granularity" name="granularity">
+                <option value="month" {% if granularity.value == "month" %}selected{% endif %}>По месяцам (1–6)</option>
+                <option value="week" {% if granularity.value == "week" %}selected{% endif %}>По неделям (1–12)</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-body-secondary" for="horizon">Горизонт, периодов</label>
+            <input class="form-control" type="number" id="horizon" name="horizon" min="1" max="12" value="{{ horizon }}">
+        </div>
+        <div class="col-md-4"><button class="btn btn-primary w-100" type="submit">Построить прогноз</button></div>
+    </div>
+</form>
+
+{% if error %}
+<div class="alert alert-warning">{{ error }}</div>
+{% else %}
+{% set best = report.result.best %}
+{% set unit = "месяц" if report.granularity.value == "month" else "неделю" %}
+
+{% if report.data_gap %}
+<div class="alert alert-info small">
+    В последних полных периодах нет ни одного расхода — похоже, данные ещё не внесены.
+    Прогноз начинается с периода после последних данных ({{ report.history[-1].label }}).
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Прогноз на {{ report.horizon }} {{ "мес." if report.granularity.value == "month" else "нед." }}</div>
+        <div class="fs-4 fw-semibold">{{ byn(report.total) }}</div>
+        <span class="small text-body-secondary">в среднем {{ byn(report.total / report.horizon) }} за {{ unit }}</span>
+    </div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        <div class="small text-body-secondary">Выбранная модель</div>
+        <div class="fs-5 fw-semibold">{{ best.label }}</div>
+        <span class="small text-body-secondary">
+            MAE {{ byn(best.mae) }}{% if best.mape is not none %}, MAPE {{ "%.1f"|format(best.mape * 100) }}%{% endif %}
+            на {{ report.result.test_points }} проверочных периодах
+        </span>
+    </div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+        {% set current = report.current_forecast %}
+        <div class="small text-body-secondary">Текущий период</div>
+        {% if current %}
+        {% set progress = report.current_spent / current.value if current.value else 0 %}
+        <div class="fs-5 fw-semibold">{{ byn(report.current_spent) }} из ~{{ byn(current.value) }}</div>
+        <div class="progress my-1" style="height: 0.5rem">
+            <div class="progress-bar {{ 'bg-danger' if progress > report.current_elapsed + 0.1 else 'bg-success' }}"
+                 style="width: {{ [progress * 100, 100]|min }}%"></div>
+        </div>
+        <span class="small text-body-secondary">
+            прошло {{ "%.0f"|format(report.current_elapsed * 100) }}% периода, потрачено {{ "%.0f"|format(progress * 100) }}% прогноза
+        </span>
+        {% else %}
+        <div class="small text-body-secondary">не входит в горизонт прогноза</div>
+        {% endif %}
+    </div></div></div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+    <h2 class="h6">Фактические расходы и прогноз</h2>
+    <div class="chart-box"><canvas id="forecast-chart" aria-label="Фактические расходы и прогноз"></canvas></div>
+</div></div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+            <h2 class="h6">Сравнение моделей (бэктест)</h2>
+            <table class="table table-sm align-middle mb-2">
+                <thead class="table-light"><tr><th>Модель</th><th class="text-end">MAE, BYN</th><th class="text-end">MAPE</th></tr></thead>
+                <tbody>
+                {% for s in report.result.scores %}
+                <tr class="{{ 'table-success' if s.name == best.name else '' }}">
+                    <td>{{ s.label }}{% if s.name == best.name %} ✓{% endif %}</td>
+                    <td class="text-end">{{ s.mae|round(2)|money_float }}</td>
+                    <td class="text-end">{{ "%.1f%%"|format(s.mape * 100) if s.mape is not none else "—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p class="small text-body-secondary mb-0">
+                MAE — средняя абсолютная ошибка прогноза на один период; MAPE — та же ошибка в процентах
+                от фактических расходов.
+            </p>
+        </div></div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+            <h2 class="h6">Прогноз по категориям на {{ report.points[0].label }}</h2>
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light"><tr><th>Категория</th><th class="text-end">Прогноз</th><th class="text-end">Среднее за 3</th><th class="text-end">Изм.</th></tr></thead>
+                <tbody>
+                {% for c in report.categories %}
+                <tr>
+                    <td><span class="legend-dot" style="background: {{ c.color }}"></span>{{ c.name }}
+                        <div class="small text-body-secondary">{{ c.model }}</div></td>
+                    <td class="text-end text-nowrap">{{ c.next_value|round(2)|money_float }}</td>
+                    <td class="text-end text-nowrap">{{ c.recent_average|round(2)|money_float }}</td>
+                    <td class="text-end small">
+                        {% if c.change is none %}—{% else %}
+                        <span class="{{ 'text-danger' if c.change > 0.05 else ('text-success' if c.change < -0.05 else 'text-body-secondary') }}">
+                            {{ "+" if c.change > 0 else "" }}{{ "%.0f"|format(c.change * 100) }}%
+                        </span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+</div>
+<script type="application/json" id="forecast-data">{{ chart_data|tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/forecast.js') }}"></script>
+{% endblock %}

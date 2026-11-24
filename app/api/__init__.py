@@ -6,6 +6,7 @@ from app.api import (
     analytics,
     categories,
     categorization,
+    forecast,
     health,
     imports,
     rates,
@@ -18,6 +19,7 @@ api_router.include_router(health.router)
 api_router.include_router(transactions.router)
 api_router.include_router(analytics.router)
 api_router.include_router(recurring.router)
+api_router.include_router(forecast.router)
 api_router.include_router(imports.router)
 api_router.include_router(categories.router)
 api_router.include_router(categorization.router)
