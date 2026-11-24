@@ -8,16 +8,24 @@
     <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
 </head>
 <body class="d-flex flex-column min-vh-100 bg-body-tertiary">
+{# Menu: (key, href, label) or (label, [submenu items]) for a dropdown group. #}
 {% set nav_items = [
     ("index", "/", "Главная"),
-    ("transactions", "/transactions", "Операции"),
-    ("analytics", "/analytics", "Аналитика"),
-    ("recurring", "/recurring", "Регулярные"),
-    ("forecast", "/forecast", "Прогноз"),
+    ("Операции", [
+        ("transactions", "/transactions", "Список операций"),
+        ("transaction_new", "/transactions/new", "Добавить операцию"),
+        ("import", "/import", "Импорт из файла"),
+    ]),
+    ("Анализ", [
+        ("analytics", "/analytics", "Аналитика"),
+        ("recurring", "/recurring", "Регулярные платежи"),
+        ("forecast", "/forecast", "Прогноз расходов"),
+    ]),
     ("recommendations", "/recommendations", "Рекомендации"),
-    ("import", "/import", "Импорт"),
-    ("categories", "/categories", "Категории"),
-    ("categorization", "/categorization", "Категоризация"),
+    ("Категории", [
+        ("categories", "/categories", "Категории и правила"),
+        ("categorization", "/categorization", "Категоризация (ML)"),
+    ]),
 ] %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
     <div class="container">
@@ -28,10 +36,25 @@
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav me-auto">
-                {% for key, href, label in nav_items %}
+                {% for item in nav_items %}
+                {% if item|length == 2 %}
+                {% set label, children = item %}
+                {% set group_active = active_page in children|map(attribute=0) %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {% if group_active %}active{% endif %}" href="#"
+                       role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ label }}</a>
+                    <ul class="dropdown-menu">
+                        {% for key, href, child_label in children %}
+                        <li><a class="dropdown-item {% if active_page == key %}active{% endif %}" href="{{ href }}">{{ child_label }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                {% else %}
+                {% set key, href, label = item %}
                 <li class="nav-item">
                     <a class="nav-link {% if active_page == key %}active{% endif %}" href="{{ href }}">{{ label }}</a>
                 </li>
+                {% endif %}
                 {% endfor %}
             </ul>
             <a class="btn btn-sm btn-outline-light" href="/docs" target="_blank">API</a>

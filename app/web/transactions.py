@@ -139,7 +139,7 @@ def _render_form(
         request,
         "transactions/form.html",
         {
-            "active_page": "transactions",
+            "active_page": "transactions" if transaction else "transaction_new",
             "form": form,
             "transaction": transaction,
             "errors": errors or {},
