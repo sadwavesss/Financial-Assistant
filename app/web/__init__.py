@@ -9,6 +9,7 @@ from app.web import (
     forecast,
     imports,
     pages,
+    recommendations,
     recurring,
     transactions,
 )
@@ -19,6 +20,7 @@ web_router.include_router(transactions.router)
 web_router.include_router(analytics.router)
 web_router.include_router(recurring.router)
 web_router.include_router(forecast.router)
+web_router.include_router(recommendations.router)
 web_router.include_router(imports.router)
 web_router.include_router(categories.router)
 web_router.include_router(categorization.router)

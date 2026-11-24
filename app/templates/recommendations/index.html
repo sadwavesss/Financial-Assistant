@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "partials/recommendation.html" import recommendation_card %}
+
+{% block title %}Рекомендации — {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Рекомендации по бюджету</h1>
+<p class="text-body-secondary small mb-3">
+    Рекомендации формирует машина вывода по базе продукционных правил «ЕСЛИ … ТО …».
+    Исходные факты поступают из аналитики, прогноза (ML-модель) и поиска регулярных платежей;
+    правила могут выводить новые факты, на которые опираются другие правила. У каждой рекомендации
+    можно посмотреть, какие условия и с какими значениями выполнились.
+</p>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        {% for r in report.recommendations %}
+            {{ recommendation_card(r) }}
+        {% else %}
+        <div class="alert alert-info">
+            {% if report.facts.get("expense_month") is none %}
+            Недостаточно данных: нет операций за прошлый месяц. Добавьте или импортируйте операции.
+            {% else %}
+            Ни одно правило не сработало — показатели бюджета в пределах нормы.
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+            <h2 class="h6">Факты</h2>
+            <table class="table table-sm small mb-0">
+                <tbody>
+                {% for label, value, source in report.fact_rows() %}
+                <tr><td>{{ label }}</td><td class="text-end text-nowrap">{{ value }}</td>
+                    <td class="text-body-secondary text-nowrap">{{ source }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div></div>
+
+        <div class="card border-0 shadow-sm"><div class="card-body">
+            <h2 class="h6">Протокол вывода</h2>
+            <p class="small text-body-secondary">
+                Проходов: {{ report.result.passes }}, сработало правил: {{ report.result.firings|length }}
+                из {{ report.kb.rules|length }}.
+            </p>
+            <ol class="small mb-0">
+                {% for f in report.result.firings %}
+                <li>
+                    <span class="badge text-bg-light border">проход {{ f.pass_number }}</span>
+                    <code>{{ f.rule.id }}</code>{% if f.binding %} [{{ f.binding }}]{% endif %} — {{ f.rule.description }}
+                    {% if f.derived %}<div class="text-primary">→ выведен факт «{{ report.kb.label(f.derived[0]) }}»</div>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

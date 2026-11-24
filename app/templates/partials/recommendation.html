@@ -1,0 +1,29 @@
+{# One recommendation card with a collapsible "why" explanation. #}
+{% set severity_styles = {
+    "high": ("border-danger", "text-bg-danger", "Важно"),
+    "medium": ("border-warning", "text-bg-warning", "Внимание"),
+    "info": ("border-info", "text-bg-info", "К сведению"),
+    "positive": ("border-success", "text-bg-success", "Хорошо"),
+} %}
+{% macro recommendation_card(r, explain=True) %}
+{% set border, badge, label = severity_styles[r.severity] %}
+<div class="card border-0 border-start border-4 {{ border }} shadow-sm mb-2">
+    <div class="card-body py-3">
+        <div class="d-flex justify-content-between gap-2">
+            <h3 class="h6 mb-1">{{ r.title }}</h3>
+            <span class="badge {{ badge }} align-self-start">{{ label }}</span>
+        </div>
+        <p class="mb-1">{{ r.text }}</p>
+        {% if explain %}
+        <details class="small">
+            <summary class="text-body-secondary">Почему? (правило {{ r.rule_id }})</summary>
+            <ul class="list-unstyled mt-2 mb-0 font-monospace">
+                {% for line in r.explanation %}
+                <li class="{{ 'text-success' if line.passed else 'text-body-secondary' }}" style="white-space: pre-wrap">{{ "✓" if line.passed else "✗" }} {{ line.text }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

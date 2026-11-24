@@ -8,13 +8,12 @@ from fastapi.templating import Jinja2Templates
 from app import __version__
 from app.config import TEMPLATES_DIR, get_settings
 from app.labels import CATEGORY_SOURCE_LABELS, RATE_SOURCE_LABELS, TRANSACTION_TYPE_LABELS
+from app.utils.formatting import format_money
 
 
-def format_money(value: Decimal | None) -> str:
-    """Decimal("1234.5") -> "1 234,50" (Russian style, non-breaking thousands separator)."""
-    if value is None:
-        return ""
-    return f"{value:,.2f}".replace(",", "\u00a0").replace(".", ",")
+def format_money_float(value: float | None) -> str:
+    """Same as `money` for float values coming from statistical models."""
+    return format_money(Decimal(str(round(value, 2)))) if value is not None else ""
 
 
 def format_rate(value: Decimal | None) -> str:
@@ -38,13 +37,6 @@ templates.env.globals.update(
     rate_source_labels=RATE_SOURCE_LABELS,
     category_source_labels=CATEGORY_SOURCE_LABELS,
 )
-
-
-def format_money_float(value: float | None) -> str:
-    """Same as `money` for float values coming from statistical models."""
-    return format_money(Decimal(str(round(value, 2)))) if value is not None else ""
-
-
 templates.env.filters.update(
     money=format_money, money_float=format_money_float, rate=format_rate, date_ru=format_date
 )

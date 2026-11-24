@@ -29,6 +29,10 @@
   External HTTP APIs live in `integrations/`; shared FastAPI deps in `app/dependencies.py`.
 - Business errors: raise `ServiceError` subclasses (`app/services/errors.py`) with Russian
   messages; a global handler turns them into JSON (`/api`) or an HTML error page.
+- Recommendations: generic engine `services/inference.py` (validated KB schema, forward
+  chaining, trace); knowledge base `app/knowledge/recommendation_rules.json` (facts with labels,
+  category groups, rules); facts and explanations in `services/recommendations.py`.
+  A new fact used by a rule must be added to the KB `facts` (or `category_facts`).
 - Categorization code: `services/rule_matcher.py` (symbolic), `ml/text_classifier.py`
   (statistical), `services/categorization.py` (arbiter, trace, training),
   `services/categorization_eval.py` (rules vs ML vs hybrid). Tests use a temporary

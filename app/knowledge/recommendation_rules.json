@@ -1,0 +1,265 @@
+{
+  "facts": {
+    "month_label": {"label": "Анализируемый месяц", "format": "text", "source": "аналитика"},
+    "income_month": {"label": "Доходы за месяц", "format": "money", "source": "аналитика"},
+    "expense_month": {"label": "Расходы за месяц", "format": "money", "source": "аналитика"},
+    "balance_month": {"label": "Баланс за месяц", "format": "money", "source": "аналитика"},
+    "deficit_amount": {"label": "Превышение расходов над доходами", "format": "money", "source": "аналитика"},
+    "savings_rate_month": {"label": "Доля сбережений за месяц", "format": "percent", "source": "аналитика"},
+    "savings_rate_avg": {"label": "Доля сбережений, среднее за 3 месяца", "format": "percent", "source": "аналитика"},
+    "expense_avg3": {"label": "Средние расходы за 3 предыдущих месяца", "format": "money", "source": "аналитика"},
+    "expense_change": {"label": "Изменение расходов к среднему за 3 месяца", "format": "percent", "source": "аналитика"},
+    "expense_recent_avg": {"label": "Средние расходы за последние 3 месяца", "format": "money", "source": "аналитика"},
+    "needs_share": {"label": "Доля обязательных расходов", "format": "percent", "source": "аналитика + база знаний"},
+    "wants_share": {"label": "Доля необязательных расходов («желания»)", "format": "percent", "source": "аналитика + база знаний"},
+    "forecast_current": {"label": "Прогноз расходов на текущий месяц", "format": "money", "source": "прогноз (ML)"},
+    "forecast_model": {"label": "Модель прогноза", "format": "text", "source": "прогноз (ML)"},
+    "forecast_vs_recent": {"label": "Прогноз относительно среднего за 3 месяца", "format": "percent", "source": "прогноз (ML)"},
+    "current_spent": {"label": "Потрачено в текущем месяце", "format": "money", "source": "аналитика"},
+    "current_elapsed": {"label": "Прошедшая доля текущего месяца", "format": "percent", "source": "календарь"},
+    "pace_ratio": {"label": "Темп трат относительно прогноза", "format": "percent", "source": "прогноз (ML)"},
+    "recurring_monthly": {"label": "Регулярные расходы в месяц", "format": "money", "source": "регулярные платежи"},
+    "recurring_share": {"label": "Доля регулярных платежей в расходах", "format": "percent", "source": "регулярные платежи"},
+    "subscriptions_count": {"label": "Число активных подписок", "format": "int", "source": "регулярные платежи"},
+    "subscription_names": {"label": "Активные подписки", "format": "list", "source": "регулярные платежи"},
+    "upcoming_7d_amount": {"label": "Регулярные платежи в ближайшие 7 дней", "format": "money", "source": "регулярные платежи"},
+    "upcoming_7d_names": {"label": "Ближайшие регулярные платежи", "format": "list", "source": "регулярные платежи"},
+    "stopped_count": {"label": "Число прекратившихся платежей", "format": "int", "source": "регулярные платежи"},
+    "stopped_names": {"label": "Прекратившиеся платежи", "format": "list", "source": "регулярные платежи"},
+    "needs_review": {"label": "Операций, требующих проверки категории", "format": "int", "source": "категоризация"},
+    "categories": {"label": "Расходы по категориям", "format": "list", "source": "аналитика"},
+    "deficit": {"label": "Дефицит бюджета", "format": "bool", "source": "вывод по правилам"},
+    "low_savings": {"label": "Низкие сбережения", "format": "bool", "source": "вывод по правилам"},
+    "forecast_growth": {"label": "Ожидается рост расходов", "format": "bool", "source": "вывод по правилам"},
+    "overspending_pace": {"label": "Перерасход по темпу трат", "format": "bool", "source": "вывод по правилам"},
+    "budget_risk": {"label": "Риск для бюджета", "format": "bool", "source": "вывод по правилам"}
+  },
+  "category_facts": {
+    "name": {"label": "Категория", "format": "text"},
+    "amount": {"label": "Расходы категории за месяц", "format": "money"},
+    "share": {"label": "Доля категории в расходах месяца", "format": "percent"},
+    "avg3": {"label": "Среднее по категории за 3 предыдущих месяца", "format": "money"},
+    "growth": {"label": "Рост категории к среднему за 3 месяца", "format": "percent"},
+    "group": {"label": "Группа (обязательные / желания)", "format": "text"}
+  },
+  "category_groups": {
+    "needs": ["Продукты", "Жильё и ЖКУ", "Связь и интернет", "Транспорт", "Здоровье", "Образование", "Автомобиль"],
+    "wants": ["Кафе и рестораны", "Одежда и обувь", "Красота и уход", "Дом и быт", "Маркетплейсы", "Развлечения и досуг", "Подписки и сервисы", "Прочие расходы"]
+  },
+  "rules": [
+    {
+      "id": "D1_deficit",
+      "description": "Расходы месяца больше доходов — дефицит бюджета",
+      "priority": 10,
+      "when": {"fact": "expense_month", "op": ">", "fact_ref": "income_month"},
+      "then": {"derive": {"fact": "deficit", "value": true}}
+    },
+    {
+      "id": "D2_low_savings",
+      "description": "Сбережения в среднем ниже 10 % доходов",
+      "priority": 11,
+      "when": {"fact": "savings_rate_avg", "op": "<", "value": 0.10},
+      "then": {"derive": {"fact": "low_savings", "value": true}}
+    },
+    {
+      "id": "D3_forecast_growth",
+      "description": "Прогноз на текущий месяц выше среднего за 3 месяца более чем на 15 %",
+      "priority": 12,
+      "when": {"fact": "forecast_vs_recent", "op": ">", "value": 0.15},
+      "then": {"derive": {"fact": "forecast_growth", "value": true}}
+    },
+    {
+      "id": "D4_overspending_pace",
+      "description": "Прошло не меньше четверти месяца, а темп трат выше прогноза на 15 %",
+      "priority": 13,
+      "when": {"all": [
+        {"fact": "current_elapsed", "op": ">=", "value": 0.25},
+        {"fact": "pace_ratio", "op": ">", "value": 1.15}
+      ]},
+      "then": {"derive": {"fact": "overspending_pace", "value": true}}
+    },
+    {
+      "id": "D5_budget_risk",
+      "description": "Риск для бюджета: дефицит, либо рост расходов (по прогнозу или по темпу) при низких сбережениях",
+      "priority": 14,
+      "when": {"any": [
+        {"fact": "deficit", "op": "==", "value": true},
+        {"all": [
+          {"fact": "forecast_growth", "op": "==", "value": true},
+          {"fact": "low_savings", "op": "==", "value": true}
+        ]},
+        {"all": [
+          {"fact": "overspending_pace", "op": "==", "value": true},
+          {"fact": "low_savings", "op": "==", "value": true}
+        ]}
+      ]},
+      "then": {"derive": {"fact": "budget_risk", "value": true}}
+    },
+    {
+      "id": "R1_budget_risk",
+      "description": "Предупреждение о риске для бюджета (выведенный факт)",
+      "priority": 20,
+      "when": {"fact": "budget_risk", "op": "==", "value": true},
+      "then": {"recommend": {
+        "severity": "high",
+        "title": "Риск для бюджета",
+        "text": "Несколько признаков указывают на напряжённость бюджета. Сократите необязательные расходы и сформируйте финансовую подушку в размере 3–6 месячных расходов (сейчас в среднем {expense_recent_avg|money} в месяц)."
+      }}
+    },
+    {
+      "id": "R2_deficit",
+      "description": "Расходы превысили доходы",
+      "priority": 30,
+      "when": {"fact": "deficit", "op": "==", "value": true},
+      "then": {"recommend": {
+        "severity": "high",
+        "title": "Расходы превысили доходы",
+        "text": "За {month_label} расходы ({expense_month|money}) превысили доходы ({income_month|money}) на {deficit_amount|money}. Проверьте самые затратные категории и крупные разовые покупки."
+      }}
+    },
+    {
+      "id": "R3_spending_pace",
+      "description": "Высокий темп трат в текущем месяце",
+      "priority": 40,
+      "when": {"fact": "overspending_pace", "op": "==", "value": true},
+      "then": {"recommend": {
+        "severity": "high",
+        "title": "Высокий темп трат в этом месяце",
+        "text": "Потрачено {current_spent|money} при прогнозе на месяц {forecast_current|money}: прошло {current_elapsed|percent} месяца, а темп трат составляет {pace_ratio|percent} от ожидаемого. Если продолжить в том же темпе, месячный прогноз будет превышен."
+      }}
+    },
+    {
+      "id": "R4_forecast_growth",
+      "description": "Прогноз расходов выше обычного",
+      "priority": 50,
+      "when": {"fact": "forecast_growth", "op": "==", "value": true},
+      "then": {"recommend": {
+        "severity": "medium",
+        "title": "Прогноз расходов выше обычного",
+        "text": "Модель «{forecast_model}» прогнозирует {forecast_current|money} на текущий месяц — на {forecast_vs_recent|percent} больше среднего за 3 месяца ({expense_recent_avg|money}). Заранее запланируйте крупные траты."
+      }}
+    },
+    {
+      "id": "R5_low_savings",
+      "description": "Низкая доля сбережений без дефицита",
+      "priority": 60,
+      "when": {"all": [
+        {"fact": "low_savings", "op": "==", "value": true},
+        {"not": {"fact": "deficit", "op": "==", "value": true}}
+      ]},
+      "then": {"recommend": {
+        "severity": "medium",
+        "title": "Низкая доля сбережений",
+        "text": "В среднем за 3 месяца откладывается {savings_rate_avg|percent} доходов. По правилу 50/30/20 рекомендуется сберегать около 20 %: начните с автоматического перевода части дохода в день зарплаты."
+      }}
+    },
+    {
+      "id": "R6_wants_share",
+      "description": "Доля необязательных расходов выше 30 % (правило 50/30/20)",
+      "priority": 70,
+      "when": {"fact": "wants_share", "op": ">", "value": 0.30},
+      "then": {"recommend": {
+        "severity": "medium",
+        "title": "Много трат на «желания»",
+        "text": "Необязательные расходы за {month_label} составили {wants_share|percent} (ориентир правила 50/30/20 — не более 30 %), обязательные — {needs_share|percent}."
+      }}
+    },
+    {
+      "id": "R7_category_growth",
+      "description": "Расходы категории выросли более чем на 30 % к среднему (при сумме больше 50 BYN)",
+      "priority": 80,
+      "scope": "category",
+      "when": {"all": [
+        {"fact": "category.growth", "op": ">", "value": 0.30},
+        {"fact": "category.amount", "op": ">", "value": 50},
+        {"fact": "category.avg3", "op": ">", "value": 0}
+      ]},
+      "then": {"recommend": {
+        "severity": "medium",
+        "title": "Рост расходов: {category.name}",
+        "text": "За {month_label} на «{category.name}» потрачено {category.amount|money} — на {category.growth|percent} больше среднего за предыдущие 3 месяца ({category.avg3|money})."
+      }}
+    },
+    {
+      "id": "R8_recurring_share",
+      "description": "Регулярные платежи занимают больше 20 % расходов",
+      "priority": 90,
+      "when": {"fact": "recurring_share", "op": ">", "value": 0.20},
+      "then": {"recommend": {
+        "severity": "medium",
+        "title": "Большая доля регулярных платежей",
+        "text": "Регулярные платежи — {recurring_monthly|money} в месяц, это {recurring_share|percent} всех расходов. Пересмотрите тарифы связи и подписки."
+      }}
+    },
+    {
+      "id": "R9_subscriptions",
+      "description": "Три и более активных подписки",
+      "priority": 100,
+      "when": {"fact": "subscriptions_count", "op": ">=", "value": 3},
+      "then": {"recommend": {
+        "severity": "info",
+        "title": "Проверьте подписки",
+        "text": "Активных подписок: {subscriptions_count|int} ({subscription_names}). Отключите те, которыми не пользуетесь."
+      }}
+    },
+    {
+      "id": "R10_upcoming",
+      "description": "В ближайшие 7 дней ожидаются регулярные платежи",
+      "priority": 110,
+      "when": {"fact": "upcoming_7d_amount", "op": ">", "value": 0},
+      "then": {"recommend": {
+        "severity": "info",
+        "title": "Ближайшие регулярные платежи",
+        "text": "В ближайшие 7 дней ожидается {upcoming_7d_amount|money}: {upcoming_7d_names}."
+      }}
+    },
+    {
+      "id": "R11_stopped",
+      "description": "Есть регулярные платежи, которые перестали списываться",
+      "priority": 120,
+      "when": {"fact": "stopped_count", "op": ">=", "value": 1},
+      "then": {"recommend": {
+        "severity": "info",
+        "title": "Прекратившиеся платежи",
+        "text": "Не списывались в обычный срок: {stopped_names}. Если подписка отменена — всё в порядке; если нет — проверьте способ оплаты."
+      }}
+    },
+    {
+      "id": "R12_needs_review",
+      "description": "Есть операции с сомнительной автоматической категорией",
+      "priority": 130,
+      "when": {"fact": "needs_review", "op": ">", "value": 0},
+      "then": {"recommend": {
+        "severity": "info",
+        "title": "Проверьте категории операций",
+        "text": "Операций, требующих проверки категории: {needs_review|int}. Исправления повысят точность анализа и будут использованы при обучении модели."
+      }}
+    },
+    {
+      "id": "R13_good_savings",
+      "description": "Сбережения не меньше 20 % доходов и нет риска для бюджета",
+      "priority": 140,
+      "when": {"all": [
+        {"fact": "savings_rate_avg", "op": ">=", "value": 0.20},
+        {"not": {"fact": "budget_risk", "op": "==", "value": true}}
+      ]},
+      "then": {"recommend": {
+        "severity": "positive",
+        "title": "Хороший уровень сбережений",
+        "text": "В среднем за 3 месяца сберегается {savings_rate_avg|percent} доходов — выше ориентира в 20 %. Свободные средства можно разместить на депозите или накопительном счёте."
+      }}
+    },
+    {
+      "id": "R14_largest_category",
+      "description": "Одна категория занимает больше 35 % расходов месяца",
+      "priority": 150,
+      "scope": "category",
+      "when": {"fact": "category.share", "op": ">", "value": 0.35},
+      "then": {"recommend": {
+        "severity": "info",
+        "title": "Крупнейшая статья расходов: {category.name}",
+        "text": "«{category.name}» — {category.share|percent} расходов за {month_label} ({category.amount|money}). Даже небольшая экономия в этой категории заметно влияет на бюджет."
+      }}
+    }
+  ]
+}
